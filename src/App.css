@@ -1,38 +1,103 @@
-.App {
-  text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.controls {
+  padding: 0.75rem 1rem; /* Điều chỉnh lại padding một chút */
+  background-color: #20232a;
+  border-bottom: 1px solid #444;
+  display: flex; /* Dùng flexbox để dàn layout */
+  flex-direction: column; /* Các hàng sẽ xếp chồng lên nhau */
+  gap: 0.75rem; /* Khoảng cách giữa các hàng */
+}
+.control-row {
+  display: flex;
+  align-items: center; /* Căn giữa các item theo chiều dọc */
+  gap: 15px; /* Khoảng cách giữa các item trên một hàng */
+  width: 100%;
+}
+
+h1 {
+  margin: 0 0 1rem 0;
+}
+
+.controls h1 {
+  font-size: 1.25em; /* Giảm cỡ chữ */
+  margin: 0; /* Bỏ margin mặc định */
+  margin-right: auto; /* Quan trọng: Đẩy các nút về phía bên phải */
+}
+
+button {
+  background-color: #61dafb;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  color: #20232a;
+  font-weight: bold;
+}
+
+button:hover:not(:disabled) {
+  background-color: #21a1f2;
+}
+
+/* Khu vực hiển thị toàn màn hình */
+.viewer-container {
+  flex-grow: 1; /* Chiếm hết không gian dọc còn lại */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  overflow: hidden; /* Quan trọng: Ẩn các phần ảnh bị tràn khi zoom */
+  background-color: #20232a;
+  padding: 1rem;
+}
+
+.placeholder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  font-size: 1.5em;
+  color: #666;
+}
+
+/* Container cho nhóm input */
+.input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 0; /* Bỏ margin-bottom cũ */
+  flex-grow: 1; /* Cho phép nó chiếm hết không gian còn lại trên hàng */
+}
+
+/* Style chung cho các ô nhập liệu */
+.text-input {
+  padding: 8px 12px; /* Thêm khoảng đệm bên trong cho dễ nhìn */
+  border: 1px solid #ccc; /* Đổi viền mặc định thành màu xám nhạt */
+  border-radius: 4px; /* Bo tròn các góc */
+  font-size: 14px; /* Cỡ chữ thống nhất */
+  outline: none; /* Bỏ viền xanh mặc định của trình duyệt khi focus */
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Thêm hiệu ứng chuyển động mượt mà */
+}
+
+/* Hiệu ứng khi được chọn (focus) */
+.text-input:focus {
+  border-color: #007bff; /* Đổi màu viền thành xanh dương */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); /* Thêm hiệu ứng hào quang xanh */
 }

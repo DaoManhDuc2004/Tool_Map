@@ -1,0 +1,72 @@
+/* src/PropertyEditor.css */
+.property-editor {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  background-color: #f1f1f1;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+.editor-header {
+  padding: 10px 15px;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.editor-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+.editor-body {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+.form-group label {
+  margin-bottom: 5px;
+  font-weight: bold;
+  font-size: 14px;
+}
+.form-group input,
+.form-group select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.form-group input:disabled {
+  background-color: #e9ecef;
+}
+.editor-footer {
+  padding: 10px 15px;
+  border-top: 1px solid #ccc;
+  text-align: right;
+}
+.editor-footer button {
+  margin-left: 10px;
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.editor-footer button:first-of-type {
+  background-color: #007bff;
+  color: white;
+}
