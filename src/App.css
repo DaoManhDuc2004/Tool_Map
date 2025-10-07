@@ -24,6 +24,7 @@ body {
   flex-direction: column; /* Các hàng sẽ xếp chồng lên nhau */
   gap: 0.75rem; /* Khoảng cách giữa các hàng */
 }
+
 .control-row {
   display: flex;
   align-items: center; /* Căn giữa các item theo chiều dọc */
@@ -31,14 +32,15 @@ body {
   width: 100%;
 }
 
-h1 {
-  margin: 0 0 1rem 0;
-}
-
+/* Sửa lại H1 để nhỏ hơn và chiếm không gian hợp lý */
 .controls h1 {
   font-size: 1.25em; /* Giảm cỡ chữ */
   margin: 0; /* Bỏ margin mặc định */
   margin-right: auto; /* Quan trọng: Đẩy các nút về phía bên phải */
+}
+
+h1 {
+  margin: 0 0 1rem 0;
 }
 
 button {
@@ -82,8 +84,7 @@ button:hover:not(:disabled) {
 .input-group {
   display: flex;
   gap: 10px;
-  margin-bottom: 0; /* Bỏ margin-bottom cũ */
-  flex-grow: 1; /* Cho phép nó chiếm hết không gian còn lại trên hàng */
+  margin-bottom: 10px;
 }
 
 /* Style chung cho các ô nhập liệu */

@@ -20,7 +20,6 @@ const Map2DViewer = ({ src }) => {
       maxScale={20} // Tăng giới hạn phóng to
       limitToBounds={false}
       centerZoomedOut={false}
-      // --- CÁC TINH CHỈNH ĐỂ MƯỢT HƠN ---
       panning={{
         velocityDisabled: true, // Tắt hiệu ứng 'trượt' sau khi kéo thả, cho cảm giác bám dính hơn.
       }}

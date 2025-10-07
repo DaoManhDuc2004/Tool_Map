@@ -1,72 +1,123 @@
 /* src/PropertyEditor.css */
+
 .property-editor {
-  position: absolute;
-  top: 20px;
+  /* Sửa lại vị trí và màu sắc */
+  position: fixed;
+  top: 50%;
   right: 20px;
-  width: 300px;
-  background-color: #f1f1f1;
-  border: 1px solid #ccc;
+  transform: translateY(-50%); /* Chỉ cần dịch chuyển theo chiều dọc */
+  width: 350px;
+  background-color: #282c34; /* Hợp với theme tối */
+  border: 1px solid #444;
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
   z-index: 1000;
+  color: white; /* Đổi màu chữ thành trắng */
+
+  /* === BẮT ĐẦU PHẦN QUAN TRỌNG === */
   display: flex;
   flex-direction: column;
+  height: 90vh; /* Giới hạn chiều cao bằng 90% chiều cao màn hình */
+  max-height: 700px; /* Chiều cao tối đa, tránh bị quá dài */
+  /* ================================ */
 }
+
 .editor-header {
   padding: 10px 15px;
-  background-color: #e9ecef;
-  border-bottom: 1px solid #ccc;
+  background-color: #20232a; /* Hợp với theme tối */
+  border-bottom: 1px solid #444;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* === THÊM MỚI === */
+  flex-shrink: 0; /* Không cho co lại */
 }
+
 .editor-header h3 {
   margin: 0;
   font-size: 16px;
 }
+
 .close-btn {
   background: none;
   border: none;
   font-size: 24px;
   cursor: pointer;
+  color: white; /* Đổi màu nút đóng */
 }
+
 .editor-body {
   padding: 15px;
   display: flex;
   flex-direction: column;
   gap: 15px;
+
+  /* === THÊM 2 DÒNG NÀY VÀO ĐÂY === */
+  overflow-y: auto; /* Tự động hiển thị thanh trượt dọc */
+  flex-grow: 1; /* Cho phép lấp đầy không gian còn lại */
 }
+
 .form-group {
   display: flex;
   flex-direction: column;
 }
+
 .form-group label {
   margin-bottom: 5px;
   font-weight: bold;
   font-size: 14px;
+  color: #bbb; /* Màu chữ label nhạt hơn */
 }
+
+/* Style cho input và select ở theme tối */
 .form-group input,
 .form-group select {
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid #555;
   border-radius: 4px;
+  background-color: #333;
+  color: white;
 }
+
 .form-group input:disabled {
-  background-color: #e9ecef;
+  background-color: #444;
+  color: #888;
 }
+
+.form-group .coords-display {
+  padding: 8px;
+  background-color: #333;
+  border-radius: 4px;
+  color: #ddd;
+  font-family: monospace;
+}
+
 .editor-footer {
   padding: 10px 15px;
-  border-top: 1px solid #ccc;
+  border-top: 1px solid #444;
   text-align: right;
+  background-color: #20232a; /* Hợp với theme tối */
+  /* === THÊM MỚI === */
+  flex-shrink: 0; /* Không cho co lại */
 }
+
 .editor-footer button {
   margin-left: 10px;
   padding: 8px 15px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-weight: bold;
 }
+
+/* Nút Lưu */
 .editor-footer button:first-of-type {
   background-color: #007bff;
+  color: white;
+}
+
+/* Nút Hủy */
+.editor-footer button:last-of-type {
+  background-color: #555;
   color: white;
 }

@@ -208,6 +208,9 @@ const MapEditor = ({
       setMeasurement({ points: [point, point], distance: 0 });
       return; // Dừng lại để không chạy code vẽ ở dưới
     }
+    if (e.target !== konvaStage) {
+      return;
+    }
 
     const drawingTools = ["draw_wall", "draw_rect", "draw_nogo", "draw_slow"];
     if (!drawingTools.includes(tool)) return;
@@ -747,6 +750,7 @@ const MapEditor = ({
                           ]}
                           stroke={isSelected ? "#00e6e6" : "red"}
                           strokeWidth={3 / stage.scale}
+                          hitStrokeWidth={15 / stage.scale}
                           onClick={(e) => handleObjectClick(e, path)}
                         />
                         <Arrow
@@ -799,6 +803,7 @@ const MapEditor = ({
                                 ]}
                                 stroke={isSelected ? "#00e6e6" : "red"}
                                 strokeWidth={2 / stage.scale}
+                                hitStrokeWidth={15 / stage.scale}
                                 onClick={(e) => handleObjectClick(e, path)}
                               />
                               <Line
@@ -809,6 +814,7 @@ const MapEditor = ({
                                   toPoint.y - offsetY,
                                 ]}
                                 stroke={isSelected ? "#00e6e6" : "red"}
+                                hitStrokeWidth={15 / stage.scale}
                                 strokeWidth={2 / stage.scale}
                                 listening={false}
                               />
@@ -870,6 +876,7 @@ const MapEditor = ({
                     <Path
                       data={svgPathData}
                       stroke={isSelected ? "#00e6e6" : "red"}
+                      hitStrokeWidth={15 / stage.scale}
                       strokeWidth={3 / stage.scale}
                       onClick={(e) => handleObjectClick(e, path)}
                     />
@@ -897,12 +904,10 @@ const MapEditor = ({
                             // Khi thả điểm ra, bật lại kéo bản đồ (nếu đang ở tool 'select')
                             setIsStageDraggable(true);
                           }}
-                          // ===============================================
                         />
                       ))}
 
                     {(() => {
-                      // --- LOGIC MỚI: Lấy các điểm cần thiết để tính toán tangent ---
                       const startPoint = pathNodes[0];
                       const endPoint = pathNodes[pathNodes.length - 1];
                       const firstControlPoint = path.controlPoints[0];
@@ -940,6 +945,7 @@ const MapEditor = ({
                             fill={isSelected ? "#00e6e6" : "red"}
                             stroke={isSelected ? "#00e6e6" : "red"}
                             strokeWidth={0}
+                            hitStrokeWidth={15 / stage.scale}
                             pointerLength={15 / stage.scale}
                             pointerWidth={15 / stage.scale}
                             listening={false}

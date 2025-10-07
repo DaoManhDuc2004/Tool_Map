@@ -109,7 +109,6 @@ function App() {
           return;
       }
 
-      // Đóng stream file và thông báo thành công
       await writable.close();
       setIsDirty(false);
       alert(`Đã lưu file ${handle.name} thành công!`);
@@ -129,7 +128,6 @@ function App() {
         types: [
           {
             description: "Map & Image Files",
-            // SỬA LẠI: Gộp tất cả các loại file được chấp nhận vào trong "accept"
             accept: {
               "application/json": [".json", ".topo"],
               "image/png": [".png"],
@@ -140,8 +138,6 @@ function App() {
 
       const file = await handle.getFile();
       const fileExtension = file.name.split(".").pop().toLowerCase();
-
-      // --- LOGIC RẼ NHÁNH ĐÃ SỬA LỖI ---
 
       if (fileExtension === "json" || fileExtension === "topo") {
         // SỬA LẠI: Chỉ đọc và parse file khi đã chắc chắn nó là JSON/TOPO
@@ -332,7 +328,6 @@ function App() {
       }
     }
 
-    // Cập nhật lại state nếu có bất kỳ thay đổi nào
     if (objectWasDeleted) {
       setAllObjects(newAllObjects);
       setIsDirty(true);
@@ -356,7 +351,6 @@ function App() {
           )}
         </div>
 
-        {/* HÀNG 2: CÁC Ô NHẬP LIỆU */}
         <div className="control-row">
           <div className="input-group">
             <input
