@@ -37,6 +37,8 @@ const MapEditor = ({
   onObjectsChange,
   onEditObject,
   onDeleteObject,
+  onSelectedIdChange,
+  selectedId,
   stageRef,
 }) => {
   const containerRef = useRef(null);
@@ -58,7 +60,7 @@ const MapEditor = ({
   const { walls, zones, points, paths } = objects;
 
   // THAY ĐỔI: State cho việc chọn đối tượng và vẽ đường đi
-  const [selectedId, setSelectedId] = useState(null);
+  //const [selectedId, setSelectedId] = useState(null);
   const [pathStartPointId, setPathStartPointId] = useState(null);
   const [drawingPathPoints, setDrawingPathPoints] = useState([]);
   const [guideLines, setGuideLines] = useState([]);
@@ -140,7 +142,7 @@ const MapEditor = ({
 
   // THAY ĐỔI: Khi đổi công cụ, reset các state liên quan
   useEffect(() => {
-    setSelectedId(null);
+    onSelectedIdChange(null);
     setPathStartPointId(null);
     setDrawingPathPoints([]);
   }, [tool]);
@@ -394,7 +396,7 @@ const MapEditor = ({
     e.cancelBubble = true;
 
     if (tool === "select") {
-      setSelectedId(object.id);
+      onSelectedIdChange(object.id);
       return;
     }
 
@@ -553,7 +555,7 @@ const MapEditor = ({
       }));
       onContentChange();
     } else {
-      setSelectedId(null);
+      onSelectedIdChange(null);
       setPathStartPointId(null);
     }
   };
