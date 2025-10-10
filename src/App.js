@@ -32,6 +32,20 @@ function App() {
     setAllObjects({ walls: [], zones: [], points: [], paths: [] });
     setIsDirty(false);
   };
+  const confirmAndExecute = (action) => {
+    if (isDirty) {
+      if (
+        window.confirm(
+          "Bạn có các thay đổi chưa được lưu. Bạn có chắc chắn muốn tiếp tục mà không lưu không?"
+        )
+      ) {
+        action(); // Nếu người dùng chọn "OK", thực hiện hành động
+      }
+      // Nếu người dùng chọn "Cancel", không làm gì cả
+    } else {
+      action(); // Nếu không có gì thay đổi, thực hiện hành động ngay lập tức
+    }
+  };
 
   const handleSaveMap = async () => {
     let handle = fileHandle;
@@ -52,7 +66,6 @@ function App() {
           suggestedName: suggestedName,
           // Cung cấp các lựa chọn định dạng file
           types: [
-            { description: "PNG Image", accept: { "image/png": [".png"] } },
             {
               description: "TOPO Map File",
               accept: { "application/json": [".topo"] },
@@ -78,30 +91,62 @@ function App() {
       const writable = await handle.createWritable();
 
       switch (fileExtension) {
-        case "png":
-          if (!stageRef.current) {
-            throw new Error("Không thể truy cập canvas để xuất ảnh.");
-          }
-          // Xuất canvas thành ảnh PNG
-          const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 }); // pixelRatio 2 cho ảnh nét hơn
-          const res = await fetch(dataUrl);
-          const blob = await res.blob();
-          await writable.write(blob);
-          break;
-
         case "topo":
-        case "json":
-          // Xuất dữ liệu thành file JSON (cho cả .topo và .json)
+        case "json": {
+          // Thêm dấu ngoặc {} để tạo scope mới cho biến
+          const { pixelsPerMeter } = mapConfig;
+          if (!pixelsPerMeter) {
+            alert(
+              "Lỗi: Không tìm thấy giá trị pixelsPerMeter trong mapConfig."
+            );
+            return;
+          }
+
+          // Tạo một bản sao của các đối tượng và chuyển đổi tọa độ
+          const objectsInMeters = {
+            walls: allObjects.walls.map((wall) => ({
+              ...wall,
+              // points là một mảng [x1, y1, x2, y2], cần chia mỗi giá trị
+              points: wall.points.map((p) => p / pixelsPerMeter),
+            })),
+            zones: allObjects.zones.map((zone) => ({
+              ...zone,
+              x: zone.x / pixelsPerMeter,
+              y: zone.y / pixelsPerMeter,
+              width: zone.width / pixelsPerMeter,
+              height: zone.height / pixelsPerMeter,
+            })),
+            points: allObjects.points.map((point) => ({
+              ...point,
+              x: point.x / pixelsPerMeter,
+              y: point.y / pixelsPerMeter,
+            })),
+            paths: allObjects.paths.map((path) => {
+              if (path.pathType === "curved" && path.controlPoints) {
+                return {
+                  ...path,
+                  controlPoints: path.controlPoints.map((cp) => ({
+                    x: cp.x / pixelsPerMeter,
+                    y: cp.y / pixelsPerMeter,
+                  })),
+                };
+              }
+              return path; // Path thẳng không có tọa độ, chỉ có ID
+            }),
+          };
+
           const saveData = {
             siteId: siteId,
             siteName: siteName,
             mapConfig: mapConfig,
             backgroundImage: map2D,
-            objects: allObjects,
+            objects: objectsInMeters, // <-- Sử dụng đối tượng đã được chuyển đổi
           };
           const jsonString = JSON.stringify(saveData, null, 2);
           await writable.write(jsonString);
           break;
+        }
+        // ...
 
         default:
           // Đóng stream và báo lỗi nếu chọn định dạng không hỗ trợ
@@ -131,7 +176,6 @@ function App() {
             description: "Map & Image Files",
             accept: {
               "application/json": [".json", ".topo"],
-              "image/png": [".png"],
             },
           },
         ],
@@ -200,14 +244,50 @@ function App() {
           if (
             loadedData.objects &&
             loadedData.backgroundImage !== undefined &&
-            loadedData.mapConfig !== undefined
+            loadedData.mapConfig && // Đảm bảo mapConfig tồn tại
+            loadedData.mapConfig.pixelsPerMeter // và có giá trị pixelsPerMeter
           ) {
+            const { pixelsPerMeter } = loadedData.mapConfig;
+
+            // Tạo bản sao và chuyển đổi tọa độ từ mét sang pixel
+            const objectsInPixels = {
+              // Nếu file JSON không có sẵn các mảng này thì khởi tạo mảng rỗng
+              walls: (loadedData.objects.walls || []).map((wall) => ({
+                ...wall,
+                points: wall.points.map((p) => p * pixelsPerMeter),
+              })),
+              zones: (loadedData.objects.zones || []).map((zone) => ({
+                ...zone,
+                x: zone.x * pixelsPerMeter,
+                y: zone.y * pixelsPerMeter,
+                width: zone.width * pixelsPerMeter,
+                height: zone.height * pixelsPerMeter,
+              })),
+              points: (loadedData.objects.points || []).map((point) => ({
+                ...point,
+                x: point.x * pixelsPerMeter,
+                y: point.y * pixelsPerMeter,
+              })),
+              paths: (loadedData.objects.paths || []).map((path) => {
+                if (path.pathType === "curved" && path.controlPoints) {
+                  return {
+                    ...path,
+                    controlPoints: path.controlPoints.map((cp) => ({
+                      x: cp.x * pixelsPerMeter,
+                      y: cp.y * pixelsPerMeter,
+                    })),
+                  };
+                }
+                return path;
+              }),
+            };
+
             setFileHandle(handle);
             setSiteId(loadedData.siteId || "");
             setSiteName(loadedData.siteName || "");
             setMapConfig(loadedData.mapConfig);
             setMap2D(loadedData.backgroundImage);
-            setAllObjects(loadedData.objects);
+            setAllObjects(objectsInPixels); // <-- Sử dụng đối tượng đã được chuyển đổi
             setIsDirty(false);
             alert("Đã mở bản đồ thành công!");
           } else {
@@ -217,19 +297,6 @@ function App() {
           alert("Lỗi: File JSON không hợp lệ.");
           console.error("Lỗi parse JSON:", e);
         }
-      } else if (fileExtension === "png") {
-        // Logic xử lý PNG (giữ nguyên, nhưng giờ nó sẽ được chạy đúng)
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          setFileHandle(null);
-          setSiteId("");
-          setSiteName("");
-          setMap2D(e.target.result);
-          setMapConfig(null);
-          resetMapObjects();
-          alert("Đã import ảnh nền thành công!");
-        };
-        reader.readAsDataURL(file);
       } else {
         alert(`Định dạng file .${fileExtension} không được hỗ trợ.`);
       }
@@ -245,13 +312,60 @@ function App() {
     setIsModalOpen(true);
   };
 
-  const handleCreateMap = (config) => {
+  // App.js
+
+  const handleExportImage = async () => {
+    if (!stageRef.current) {
+      alert("Bản đồ chưa sẵn sàng để xuất ảnh.");
+      return;
+    }
+    if (!window.showSaveFilePicker) {
+      alert("Trình duyệt của bạn không hỗ trợ chức năng này.");
+      return;
+    }
+
+    try {
+      const suggestedName = `map_export_${Date.now()}`;
+
+      const handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName,
+        types: [
+          // Chỉ cho phép xuất file PNG
+          { description: "PNG Image", accept: { "image/png": [".png"] } },
+        ],
+      });
+
+      const writable = await handle.createWritable();
+
+      // Xuất canvas thành ảnh PNG
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 }); // pixelRatio 2 cho ảnh nét hơn
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+
+      await writable.write(blob);
+      await writable.close();
+
+      alert(`Đã xuất file ảnh ${handle.name} thành công!`);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Lỗi khi xuất ảnh:", error);
+        alert("Có lỗi xảy ra khi đang xuất ảnh.");
+      }
+    }
+  };
+
+  const handleCreateMap = (config, bgImage) => {
     setFileHandle(null);
     setSiteId("");
     setSiteName("");
+
+    // Dùng trực tiếp config nhận được từ Modal, không tính toán gì thêm
+    // vì nó đã luôn là mét.
     setMapConfig(config);
-    setMap2D(null);
+
     resetMapObjects();
+    setMap2D(bgImage || null);
+    setIsModalOpen(false);
   };
 
   const handleOpenEditor = (object) => {
@@ -350,14 +464,34 @@ function App() {
       }
     }
   }, [selectedId, isEditorOpen, allObjects]);
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      // Nếu có thay đổi chưa lưu, kích hoạt cảnh báo của trình duyệt
+      if (isDirty) {
+        e.preventDefault(); // Cần thiết cho một số trình duyệt
+        e.returnValue = ""; // Cần thiết cho một số trình duyệt khác
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Dọn dẹp listener khi component bị unmount
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isDirty]); // Chỉ chạy lại effect này khi isDirty thay đổi
 
   return (
     <div className="app-container">
       <div className="controls">
         <div className="control-row">
           <h1>2D Map Editor</h1>
-          <button onClick={handleNewMap}>Tạo Map mới</button>
-          <button onClick={handleLoadMap}>Mở File</button>
+          <button onClick={() => confirmAndExecute(handleNewMap)}>
+            Tạo Map mới
+          </button>
+          <button onClick={() => confirmAndExecute(handleLoadMap)}>
+            Mở File
+          </button>
           {isDirty && (
             <button
               onClick={handleSaveMap}
@@ -366,6 +500,7 @@ function App() {
               Lưu
             </button>
           )}
+          {mapConfig && <button onClick={handleExportImage}>Export</button>}
         </div>
 
         <div className="control-row">
@@ -396,23 +531,26 @@ function App() {
         </div>
       </div>
       <div className="viewer-container">
-        <MapEditor
-          backgroundImage={map2D}
-          mapConfig={mapConfig}
-          objects={allObjects}
-          onObjectsChange={setAllObjects}
-          onEditObject={handleOpenEditor}
-          onContentChange={() => setIsDirty(true)}
-          onDeleteObject={handleDeleteObject}
-          selectedId={selectedId}
-          onSelectedIdChange={setSelectedId}
-          stageRef={stageRef}
-        />
+        {mapConfig && (
+          <MapEditor
+            backgroundImage={map2D}
+            mapConfig={mapConfig}
+            objects={allObjects}
+            onObjectsChange={setAllObjects}
+            onEditObject={handleOpenEditor}
+            onContentChange={() => setIsDirty(true)}
+            onDeleteObject={handleDeleteObject}
+            selectedId={selectedId}
+            onSelectedIdChange={setSelectedId}
+            stageRef={stageRef}
+          />
+        )}
         {isEditorOpen && (
           <PropertyEditor
             object={editingObject}
             onSave={handleSaveObject}
             onClose={() => setIsEditorOpen(false)}
+            mapConfig={mapConfig}
           />
         )}
       </div>

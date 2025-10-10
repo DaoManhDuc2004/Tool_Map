@@ -33,6 +33,7 @@
 .konva-container {
   flex-grow: 1;
   background-color: #3e4451;
+  position: relative;
 }
 
 /* Thêm vào cuối file MapEditor.css */
@@ -47,4 +48,17 @@
 .toolbar button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* MapEditor.css */
+.scale-display {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 100;
 }
