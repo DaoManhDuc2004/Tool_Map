@@ -448,6 +448,31 @@ function App() {
     }
   };
 
+  // HÀM MỚI: XÓA NHIỀU ĐIỂM CÙNG LÚC
+  const handleDeletePointsInSelection = (pointIds) => {
+    if (!pointIds || pointIds.length === 0) return;
+    setAllObjects((prev) => {
+      const newPoints = prev.points.filter((p) => !pointIds.includes(p.id));
+      const newPaths = prev.paths.filter((path) => {
+        const startId = path.from || path.pointIds?.[0];
+        const endId = path.to || path.pointIds?.[path.pointIds.length - 1];
+        return !pointIds.includes(startId) && !pointIds.includes(endId);
+      });
+      return { ...prev, points: newPoints, paths: newPaths };
+    });
+    setIsDirty(true);
+  };
+
+  // HÀM MỚI: XÓA NHIỀU ĐƯỜNG CÙNG LÚC
+  const handleDeletePathsInSelection = (pathIds) => {
+    if (!pathIds || pathIds.length === 0) return;
+    setAllObjects((prev) => ({
+      ...prev,
+      paths: prev.paths.filter((p) => !pathIds.includes(p.id)),
+    }));
+    setIsDirty(true);
+  };
+
   useEffect(() => {
     // Nếu bảng thuộc tính đang mở và có một đối tượng được chọn
     if (isEditorOpen && selectedId) {
@@ -543,6 +568,8 @@ function App() {
             selectedId={selectedId}
             onSelectedIdChange={setSelectedId}
             stageRef={stageRef}
+            onDeletePointsInSelection={handleDeletePointsInSelection}
+            onDeletePathsInSelection={handleDeletePathsInSelection}
           />
         )}
         {isEditorOpen && (

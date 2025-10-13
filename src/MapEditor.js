@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Stage, Layer, Image, Rect } from "react-konva";
+import { Stage, Layer, Image, Rect, Group } from "react-konva";
 import "./MapEditor.css";
 
 import PointLayer from "./components/MapEditorComponents/PointLayer";
@@ -8,6 +8,7 @@ import ZoneLayer from "./components/MapEditorComponents/ZoneLayer";
 import MeasurementLayer from "./components/MapEditorComponents/MeasurementLayer";
 import Crosshair from "./components/MapEditorComponents/Crosshair";
 import PointMenu from "./components/Menu/PointMenu";
+import AreaContextMenu from "./components/Menu/AreaContextMenu";
 
 const useImage = (url) => {
   const [image, setImage] = useState(null);
@@ -37,6 +38,8 @@ const MapEditor = ({
   onSelectedIdChange,
   selectedId,
   stageRef,
+  onDeletePointsInSelection,
+  onDeletePathsInSelection,
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -77,6 +80,21 @@ const MapEditor = ({
     y: 0,
     pointId: null,
   });
+  const [selectionRect, setSelectionRect] = useState({
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    visible: false,
+  });
+  const [selectedObjectIds, setSelectedObjectIds] = useState([]);
+  const [areaContextMenu, setAreaContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+  const [isMovingSelection, setIsMovingSelection] = useState(false);
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     if (containerRef.current) {
@@ -171,14 +189,45 @@ const MapEditor = ({
   };
 
   const handleStageDrag = (e) => {
-    if (e.target !== e.target.getStage()) {
+    const stageNode = e.target;
+    if (stageNode !== stageNode.getStage()) {
       return;
     }
-    const stage = e.target;
+
+    const scale = stageNode.scaleX();
+    let newX = stageNode.x();
+    let newY = stageNode.y();
+
+    // Kích thước của khung nhìn (viewport)
+    const stageWidth = size.width;
+    const stageHeight = size.height;
+
+    // Đặt một khoảng đệm để người dùng không thể kéo map sát rạt vào cạnh
+    const padding = 50;
+
+    // Tính toán giới hạn cho tọa độ X
+    // Giới hạn phải: không cho mép trái của map đi qua cạnh phải của viewport
+    const maxX = padding;
+    // Giới hạn trái: không cho mép phải của map đi qua cạnh trái của viewport
+    const minX = stageWidth - contentWidth * scale - padding;
+
+    // Tính toán giới hạn cho tọa độ Y
+    const maxY = padding;
+    const minY = stageHeight - contentHeight * scale - padding;
+
+    // Áp dụng giới hạn
+    // Nếu nội dung nhỏ hơn màn hình thì không giới hạn để có thể căn giữa
+    if (contentWidth * scale > stageWidth) {
+      newX = Math.max(minX, Math.min(newX, maxX));
+    }
+    if (contentHeight * scale > stageHeight) {
+      newY = Math.max(minY, Math.min(newY, maxY));
+    }
+
     setStage({
-      scale: stage.scaleX(), // Lấy tỷ lệ hiện tại
-      x: stage.x(), // Cập nhật tọa độ x mới
-      y: stage.y(), // Cập nhật tọa độ y mới
+      scale: scale,
+      x: newX,
+      y: newY,
     });
   };
 
@@ -189,20 +238,60 @@ const MapEditor = ({
     const all = [...walls, ...zones, ...points, ...paths];
     return all.find((obj) => obj.id === id);
   };
+  const isPointInRect = (point, rect) => {
+    // Chuyển đổi tọa độ Y của điểm (bottom-left) sang hệ top-left để so sánh
+    const pointYTopLeft = contentHeight - point.y;
+
+    // Chuẩn hóa tọa độ của hình chữ nhật để width/height luôn dương
+    const rX1 = Math.min(rect.x, rect.x + rect.width);
+    const rX2 = Math.max(rect.x, rect.x + rect.width);
+    const rY1 = Math.min(rect.y, rect.y + rect.height);
+    const rY2 = Math.max(rect.y, rect.y + rect.height);
+
+    return (
+      point.x >= rX1 &&
+      point.x <= rX2 &&
+      pointYTopLeft >= rY1 &&
+      pointYTopLeft <= rY2
+    );
+  };
 
   const handleMouseDown = (e) => {
-    const konvaStage = e.target.getStage(); // Lấy đối tượng stage trực tiếp từ sự kiện
+    const konvaStage = e.target.getStage();
+    const pos = konvaStage.getPointerPosition();
+    const point = {
+      x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
+      y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
+    };
+
     if (e.target !== konvaStage) {
       if (tool !== "measure") {
         return;
       }
     }
 
-    const pos = konvaStage.getPointerPosition();
-    const point = {
-      x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
-      y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
-    };
+    if (tool === "area_select") {
+      // Kiểm tra xem có click vào trong vùng đã chọn để di chuyển không
+      if (
+        selectionRect.visible &&
+        isPointInRect({ x: point.x, y: contentHeight - point.y }, selectionRect)
+      ) {
+        setIsMovingSelection(true);
+        setDragStartPos(point);
+      } else {
+        // Nếu không thì bắt đầu vẽ vùng chọn mới
+        setIsDrawing(true);
+        setSelectionRect({
+          x: point.x,
+          y: point.y,
+          width: 0,
+          height: 0,
+          visible: true,
+        });
+        setSelectedObjectIds([]); // Xóa lựa chọn cũ
+      }
+      return; // Dừng lại để không chạy các logic khác
+    }
 
     if (tool === "measure") {
       // Mỗi lần click sẽ là một lần đo mới
@@ -277,12 +366,11 @@ const MapEditor = ({
     (e) => {
       const konvaStage = e.target.getStage();
       const pos = konvaStage.getPointerPosition();
+      const point = {
+        x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
+        y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
+      };
       if (movingPointId) {
-        let point = {
-          x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
-          y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
-        };
-
         // Giới hạn di chuyển trong phạm vi bản đồ
         const finalX = Math.max(0, Math.min(point.x, contentWidth));
         const finalY = Math.max(0, Math.min(point.y, contentHeight));
@@ -298,6 +386,54 @@ const MapEditor = ({
         }));
         onContentChange();
         return; // Dừng lại để không chạy các logic khác
+      }
+
+      if (isMovingSelection) {
+        const dx = point.x - dragStartPos.x;
+        const dy = point.y - dragStartPos.y; // dy > 0 khi chuột đi xuống
+        setSelectionRect((prev) => ({
+          ...prev, // Giữ nguyên width, height, visible
+          x: prev.x + dx,
+          y: prev.y + dy,
+        }));
+
+        onObjectsChange((prev) => {
+          const newObjects = JSON.parse(JSON.stringify(prev)); // Sao chép sâu
+
+          selectedObjectIds.forEach((id) => {
+            // Di chuyển điểm
+            const pIndex = newObjects.points.findIndex((p) => p.id === id);
+            if (pIndex !== -1) {
+              newObjects.points[pIndex].x += dx;
+              // Tọa độ Y trong state là bottom-left, nên Y phải giảm khi chuột đi xuống
+              newObjects.points[pIndex].y -= dy;
+            }
+
+            // Di chuyển control points của đường cong
+            const pathIndex = newObjects.paths.findIndex((p) => p.id === id);
+            if (pathIndex !== -1 && newObjects.paths[pathIndex].controlPoints) {
+              newObjects.paths[pathIndex].controlPoints.forEach((cp) => {
+                cp.x += dx;
+                cp.y -= dy; // Tương tự như trên
+              });
+            }
+          });
+          return newObjects;
+        });
+
+        setDragStartPos(point); // Cập nhật vị trí bắt đầu cho lần di chuyển tiếp theo
+        onContentChange();
+        return;
+      }
+
+      // --- LOGIC 2: CẬP NHẬT KÍCH THƯỚC VÙNG CHỌN KHI ĐANG VẼ ---
+      if (isDrawing && tool === "area_select") {
+        setSelectionRect((prev) => ({
+          ...prev,
+          width: point.x - prev.x,
+          height: point.y - prev.y,
+        }));
+        return;
       }
       if (tool === "place_point") {
         const mousePoint = {
@@ -397,10 +533,51 @@ const MapEditor = ({
       crosshair,
       movingPointId,
       pixelsPerMeter,
+      isMovingSelection,
+      dragStartPos,
     ]
   );
 
   const handleMouseUp = () => {
+    // Trong hàm handleMouseUp()
+
+    if (isMovingSelection) {
+      setIsMovingSelection(false);
+    }
+
+    if (isDrawing && tool === "area_select") {
+      const ids = [];
+      // Tìm tất cả các điểm trong vùng chọn
+      points.forEach((p) => {
+        if (isPointInRect(p, selectionRect)) {
+          ids.push(p.id);
+        }
+      });
+
+      // Tìm tất cả các đường mà CẢ HAI điểm đầu cuối đều trong vùng chọn
+      paths.forEach((path) => {
+        const startPoint = points.find(
+          (p) => p.id === (path.from || path.pointIds?.[0])
+        );
+        const endPoint = points.find(
+          (p) => p.id === (path.to || path.pointIds?.[path.pointIds.length - 1])
+        );
+
+        if (
+          startPoint &&
+          endPoint &&
+          isPointInRect(startPoint, selectionRect) &&
+          isPointInRect(endPoint, selectionRect)
+        ) {
+          ids.push(path.id);
+        }
+      });
+
+      setSelectedObjectIds(ids);
+    }
+
+    // Dòng này đã có sẵn, chỉ cần đảm bảo nó ở cuối cùng
+    setIsDrawing(false);
     // THÊM VÀO ĐẦU HÀM
     if (movingPointId) {
       setMovingPointId(null); // Kết thúc di chuyển
@@ -611,6 +788,54 @@ const MapEditor = ({
       setContextMenu({ visible: false, x: 0, y: 0, pointId: null });
     }
   };
+  const handleContextMenu = (e) => {
+    e.evt.preventDefault(); // Ngăn menu mặc định
+
+    // Chỉ hoạt động khi ở tool chọn vùng và đã có vùng được chọn
+    if (tool !== "area_select" || !selectionRect.visible) {
+      return;
+    }
+
+    const pos = e.target.getStage().getPointerPosition();
+    const point = {
+      x: (pos.x - stage.x) / stage.scale,
+      y: (pos.y - stage.y) / stage.scale,
+    };
+
+    // Kiểm tra xem chuột phải có nằm trong vùng chọn không
+    if (
+      isPointInRect({ x: point.x, y: contentHeight - point.y }, selectionRect)
+    ) {
+      setAreaContextMenu({ visible: true, x: pos.x, y: pos.y });
+    }
+  };
+
+  const handleAreaMenuActions = (action) => {
+    // Lọc ra các ID tương ứng với điểm và đường
+    const pointIds = selectedObjectIds.filter((id) => id.startsWith("point_"));
+    const pathIds = selectedObjectIds.filter((id) => id.startsWith("path_"));
+
+    switch (action) {
+      case "deletePaths":
+        if (pathIds.length > 0) {
+          // Gọi prop từ App.js để xóa
+          onDeletePathsInSelection(pathIds);
+        }
+        break;
+      case "deletePoints":
+        if (pointIds.length > 0) {
+          // Gọi prop từ App.js để xóa
+          onDeletePointsInSelection(pointIds);
+        }
+        break;
+      default:
+        break;
+    }
+    // Sau khi thực hiện hành động, đóng menu và reset vùng chọn
+    setAreaContextMenu({ visible: false });
+    setSelectionRect({ visible: false });
+    setSelectedObjectIds([]);
+  };
 
   // ... (Các hằng số stageWidth, stageHeight,... không đổi)
   const stageWidth = size.width;
@@ -627,9 +852,9 @@ const MapEditor = ({
           ⮝
         </button>
         <button
-          title="Vẽ Vùng (Hình chữ nhật)"
-          className={tool === "draw_rect" ? "active" : ""}
-          onClick={() => setTool("draw_rect")}
+          title="Chọn Vùng"
+          className={tool === "area_select" ? "active" : ""}
+          onClick={() => setTool("area_select")}
         >
           ⏹️ Vùng
         </button>
@@ -705,6 +930,7 @@ const MapEditor = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onClick={handleStageClick}
+          onContextMenu={handleContextMenu}
           draggable={tool === "select" && isStageDraggable}
           scaleX={stage.scale}
           scaleY={stage.scale}
@@ -768,6 +994,7 @@ const MapEditor = ({
               contentHeight={contentHeight}
               handleObjectClick={handleObjectClick}
               handlePointContextMenu={handlePointContextMenu}
+              selectedObjectIds={selectedObjectIds}
             />
 
             <MeasurementLayer
@@ -784,6 +1011,18 @@ const MapEditor = ({
               contentHeight={contentHeight}
               contentWidth={contentWidth}
             />
+            {selectionRect.visible && (
+              <Rect
+                x={selectionRect.x}
+                y={selectionRect.y}
+                width={selectionRect.width}
+                height={selectionRect.height}
+                fill="rgba(0, 100, 255, 0.2)"
+                stroke="rgba(0, 100, 255, 0.8)"
+                strokeWidth={1.5 / stage.scale}
+                listening={false}
+              />
+            )}
           </Layer>
         </Stage>
         <div className="scale-display">
@@ -798,6 +1037,18 @@ const MapEditor = ({
           />
         )}
       </div>
+      {areaContextMenu.visible && (
+        <AreaContextMenu
+          x={areaContextMenu.x}
+          y={areaContextMenu.y}
+          // onMove chưa có chức năng nên chỉ cần đóng menu
+          onMove={() => setAreaContextMenu({ visible: false })}
+          // Gọi hàm xử lý với action tương ứng
+          onDeletePaths={() => handleAreaMenuActions("deletePaths")}
+          onDeletePoints={() => handleAreaMenuActions("deletePoints")}
+          onClose={() => setAreaContextMenu({ visible: false })}
+        />
+      )}
     </div>
   );
 };
