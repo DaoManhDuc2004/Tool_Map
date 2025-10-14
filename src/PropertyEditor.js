@@ -1,91 +1,136 @@
-// src/PropertyEditor.js
-
 import React, { useState, useEffect } from "react";
 import "./PropertyEditor.css";
 
-// 1. Nhận thêm prop mapConfig
-const PropertyEditor = ({ object, onSave, onClose, mapConfig }) => {
+// <-- THAY ĐỔI: Nhận props mới
+const PropertyEditor = ({
+  selection,
+  onSaveSingle,
+  onSaveMultiple,
+  onClose,
+  mapConfig,
+}) => {
   const [formData, setFormData] = useState({});
+  const [isMultiple, setIsMultiple] = useState(false);
+  const [placeholders, setPlaceholders] = useState({});
 
   useEffect(() => {
-    if (object) {
-      setFormData({ ...object });
-    }
-  }, [object]);
+    if (!selection) return;
 
-  if (!object) {
-    return null;
-  }
+    const multiple = Array.isArray(selection);
+    setIsMultiple(multiple);
+
+    if (multiple) {
+      // Xử lý nhiều đối tượng
+      const firstObject = selection[0];
+      const newFormData = {};
+      const newPlaceholders = {};
+
+      // Duyệt qua các thuộc tính của đối tượng đầu tiên để so sánh
+      Object.keys(firstObject).forEach((key) => {
+        const allHaveSameValue = selection.every(
+          (obj) => JSON.stringify(obj[key]) === JSON.stringify(firstObject[key])
+        );
+
+        if (allHaveSameValue) {
+          newFormData[key] = firstObject[key];
+        } else {
+          newFormData[key] = ""; // Để trống nếu giá trị khác nhau
+          newPlaceholders[key] = "Nhiều giá trị"; // Placeholder cho input
+        }
+      });
+      setFormData(newFormData);
+      setPlaceholders(newPlaceholders);
+    } else {
+      // Xử lý một đối tượng như cũ
+      setFormData({ ...selection });
+      setPlaceholders({});
+    }
+  }, [selection]);
+
+  if (!selection) return null;
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const finalValue = type === "checkbox" ? checked : value;
+
+    // Khi người dùng bắt đầu gõ, xóa placeholder
+    if (placeholders[name]) {
+      setPlaceholders((prev) => ({ ...prev, [name]: "" }));
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: finalValue }));
   };
 
   const handleSave = () => {
-    const dataToSave = { ...formData };
-    dataToSave.elevation = parseFloat(dataToSave.elevation) || 0;
-    onSave(dataToSave);
+    // Chỉ lưu những trường đã được người dùng thay đổi
+    const changes = {};
+    Object.keys(formData).forEach((key) => {
+      // Chỉ lưu nếu giá trị không phải là placeholder
+      if (!placeholders[key] || placeholders[key] === "") {
+        // Chuyển đổi elevation thành số
+        if (key === "elevation") {
+          changes[key] = parseFloat(formData[key]) || 0;
+        } else {
+          changes[key] = formData[key];
+        }
+      }
+    });
+
+    if (isMultiple) {
+      onSaveMultiple(changes);
+    } else {
+      onSaveSingle(formData);
+    }
   };
 
-  // 2. Sửa lại toàn bộ hàm renderFieldsForPoint
-  const renderFieldsForPoint = () => {
-    // Khai báo biến ở đây, BÊN NGOÀI phần return
-    const pixelsPerMeter = mapConfig?.pixelsPerMeter || 1;
-    const x_in_meters = (object.x / pixelsPerMeter).toFixed(3);
-    const y_in_meters = (object.y / pixelsPerMeter).toFixed(3);
+  // Lấy ra một object mẫu để render, dù là đơn hay đa lựa chọn
+  const objectSample = isMultiple ? selection[0] : selection;
 
-    // Dùng câu lệnh "return" để trả về JSX
-    return (
-      <>
-        <div className="form-group">
-          <label>Node type (Loại nút)</label>
-          <select
-            name="nodeType"
-            value={formData.nodeType || "running area"}
-            onChange={handleChange}
-          >
-            <option value="running area">running area</option>
-            <option value="charging point">charging point</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Node Name</label>
-          <input
-            type="text"
-            name="nodeName"
-            value={formData.nodeName || ""}
-            onChange={handleChange}
-          />
-        </div>
-        <div className="form-group">
-          <label>Physical coordinates (Tọa độ vật lý)</label>
-          <p className="coords-display">
-            x = {x_in_meters} m, y = {y_in_meters} m
-          </p>
-        </div>
-      </>
-    );
-  };
-
-  const renderFieldsForPath = () => (
-    <div className="form-group">
-      <label>Hướng di chuyển (Direction)</label>
-      <select
-        name="direction"
-        value={formData.direction || "one-way"}
-        onChange={handleChange}
-      >
-        <option value="one-way">Một chiều</option>
-        <option value="two-way">Hai chiều</option>
-      </select>
-    </div>
+  const renderFieldsForPoint = () => (
+    <>
+      <div className="form-group">
+        <label>Node type (Loại nút)</label>
+        <select
+          name="nodeType"
+          value={formData.nodeType || "running area"}
+          onChange={handleChange}
+          placeholder={placeholders.nodeType}
+        >
+          <option value="running area">running area</option>
+          <option value="charging point">charging point</option>
+        </select>
+      </div>
+      <div className="form-group">
+        <label>Node Name</label>
+        <input
+          type="text"
+          name="nodeName"
+          value={formData.nodeName || ""}
+          onChange={handleChange}
+          placeholder={placeholders.nodeName}
+        />
+      </div>
+      {/* Tọa độ bị vô hiệu hóa khi sửa nhiều điểm */}
+      <div className="form-group">
+        <label>Physical coordinates</label>
+        <p
+          className="coords-display"
+          style={{ color: isMultiple ? "#888" : "inherit" }}
+        >
+          {isMultiple ? "Không thể sửa tọa độ hàng loạt" : `x, y: (chỉ đọc)`}
+        </p>
+      </div>
+    </>
   );
 
   return (
     <div className="property-editor">
       <div className="editor-header">
-        <h3>Chỉnh sửa Thuộc tính</h3>
+        <h3>
+          {isMultiple
+            ? `Sửa ${selection.length} Đối Tượng`
+            : "Chỉnh sửa Thuộc tính"}
+        </h3>
         <button onClick={onClose} className="close-btn">
           &times;
         </button>
@@ -93,7 +138,11 @@ const PropertyEditor = ({ object, onSave, onClose, mapConfig }) => {
       <div className="editor-body">
         <div className="form-group">
           <label>ID</label>
-          <input type="text" value={formData.id || ""} disabled />
+          <input
+            type="text"
+            value={isMultiple ? "(Nhiều ID)" : formData.id || ""}
+            disabled
+          />
         </div>
         <div className="form-group">
           <label>Độ cao (Z)</label>
@@ -102,12 +151,14 @@ const PropertyEditor = ({ object, onSave, onClose, mapConfig }) => {
             name="elevation"
             value={formData.elevation ?? ""}
             onChange={handleChange}
-            placeholder="Chiều cao so với mặt sàn (mm)"
+            placeholder={
+              placeholders.elevation || "Chiều cao so với mặt sàn (mm)"
+            }
           />
         </div>
 
-        {object.type === "point" && renderFieldsForPoint()}
-        {object.type === "path" && renderFieldsForPath()}
+        {objectSample.type === "point" && renderFieldsForPoint()}
+        {/* Có thể thêm logic cho path sau này */}
       </div>
       <div className="editor-footer">
         <button onClick={handleSave}>Lưu</button>

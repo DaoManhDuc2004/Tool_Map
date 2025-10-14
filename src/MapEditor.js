@@ -747,11 +747,32 @@ const MapEditor = ({
     }
   };
 
-  // THAY ĐỔI: Hàm kích hoạt Property Editor
   const handleEditClick = () => {
-    const objectToEdit = findObjectById(selectedId);
-    if (objectToEdit) {
-      onEditObject(objectToEdit);
+    // Trường hợp 1: Sửa 1 đối tượng
+    if (selectedId) {
+      const objectToEdit = findObjectById(selectedId);
+      if (objectToEdit) {
+        onEditObject(objectToEdit); // Gửi đi 1 object
+      }
+      // Trường hợp 2: Sửa nhiều đối tượng
+    } else if (selectedObjectIds.length > 0) {
+      // Lấy tất cả object point từ danh sách ID
+      const allPoints = selectedObjectIds
+        .filter((id) => id.startsWith("point_"))
+        .map((id) => findObjectById(id))
+        .filter(Boolean);
+
+      // Chỉ cho phép sửa hàng loạt nếu tất cả đều là point
+      if (
+        allPoints.length > 0 &&
+        allPoints.length === selectedObjectIds.length
+      ) {
+        onEditObject(allPoints); // Gửi đi 1 mảng object
+      } else {
+        alert(
+          "Chỉnh sửa hàng loạt chỉ hỗ trợ cho các đối tượng cùng loại (Node)."
+        );
+      }
     }
   };
 
@@ -898,7 +919,7 @@ const MapEditor = ({
         <button
           title="Chỉnh sửa Thuộc tính"
           onClick={handleEditClick}
-          disabled={!selectedId}
+          disabled={!selectedId && selectedObjectIds.length === 0}
         >
           📝 Chi tiết
         </button>

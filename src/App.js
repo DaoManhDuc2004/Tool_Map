@@ -21,7 +21,7 @@ function App() {
   });
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingObject, setEditingObject] = useState(null);
+  const [editingSelection, setEditingSelection] = useState(null);
   const [fileHandle, setFileHandle] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
@@ -368,13 +368,12 @@ function App() {
     setIsModalOpen(false);
   };
 
-  const handleOpenEditor = (object) => {
-    if (selectedId) {
-      setIsEditorOpen(true);
-    }
+  const handleOpenEditor = (selection) => {
+    setEditingSelection(selection);
+    setIsEditorOpen(true);
   };
 
-  const handleSaveObject = (updatedObject) => {
+  const handleSaveSingleObject = (updatedObject) => {
     if (!updatedObject || !updatedObject.type) {
       console.error("Đối tượng đang lưu thiếu thuộc tính 'type'");
       return;
@@ -398,6 +397,27 @@ function App() {
 
     setIsEditorOpen(false);
     //setEditingObject(null);
+  };
+
+  // THÊM HÀM MỚI NÀY
+  const handleSaveMultipleObjects = (changes) => {
+    const idsToUpdate = editingSelection.map((obj) => obj.id);
+    const objectTypeKey = `${editingSelection[0].type}s`; // vd: "points"
+
+    setAllObjects((prev) => ({
+      ...prev,
+      [objectTypeKey]: prev[objectTypeKey].map((obj) => {
+        // Nếu ID nằm trong danh sách cần cập nhật
+        if (idsToUpdate.includes(obj.id)) {
+          // Gộp object cũ với các thay đổi mới
+          return { ...obj, ...changes };
+        }
+        return obj;
+      }),
+    }));
+
+    setIsDirty(true);
+    setIsEditorOpen(false);
   };
   // Thay thế toàn bộ hàm này trong file App.js
   const handleDeleteObject = (objectId) => {
@@ -473,22 +493,6 @@ function App() {
     setIsDirty(true);
   };
 
-  useEffect(() => {
-    // Nếu bảng thuộc tính đang mở và có một đối tượng được chọn
-    if (isEditorOpen && selectedId) {
-      // Tìm đối tượng đầy đủ từ ID
-      const all = [
-        ...allObjects.walls,
-        ...allObjects.zones,
-        ...allObjects.points,
-        ...allObjects.paths,
-      ];
-      const objectToEdit = all.find((obj) => obj.id === selectedId);
-      if (objectToEdit) {
-        setEditingObject(objectToEdit); // Cập nhật đối tượng cho PropertyEditor
-      }
-    }
-  }, [selectedId, isEditorOpen, allObjects]);
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       // Nếu có thay đổi chưa lưu, kích hoạt cảnh báo của trình duyệt
@@ -574,8 +578,9 @@ function App() {
         )}
         {isEditorOpen && (
           <PropertyEditor
-            object={editingObject}
-            onSave={handleSaveObject}
+            selection={editingSelection}
+            onSaveSingle={handleSaveSingleObject}
+            onSaveMultiple={handleSaveMultipleObjects}
             onClose={() => setIsEditorOpen(false)}
             mapConfig={mapConfig}
           />
