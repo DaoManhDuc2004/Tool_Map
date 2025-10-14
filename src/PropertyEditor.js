@@ -123,6 +123,21 @@ const PropertyEditor = ({
     </>
   );
 
+  const renderFieldsForPath = () => (
+    <div className="form-group">
+      <label>Hướng di chuyển (Direction)</label>
+      <select
+        name="direction"
+        value={formData.direction || "one-way"}
+        onChange={handleChange}
+        placeholder={placeholders.direction}
+      >
+        <option value="one-way">Một chiều</option>
+        <option value="two-way">Hai chiều</option>
+      </select>
+    </div>
+  );
+
   return (
     <div className="property-editor">
       <div className="editor-header">
@@ -158,7 +173,7 @@ const PropertyEditor = ({
         </div>
 
         {objectSample.type === "point" && renderFieldsForPoint()}
-        {/* Có thể thêm logic cho path sau này */}
+        {objectSample.type === "path" && renderFieldsForPath()}
       </div>
       <div className="editor-footer">
         <button onClick={handleSave}>Lưu</button>
