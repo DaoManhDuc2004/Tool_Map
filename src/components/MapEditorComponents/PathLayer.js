@@ -235,69 +235,144 @@ const PathLayer = ({
                   const ux = dx / dist;
                   const uy = dy / dist;
 
-                  return (
-                    <Arrow
-                      points={[
-                        endPoint.x - ux * 20,
-                        endPoint.y - uy * 20,
-                        endPoint.x,
-                        endPoint.y,
-                      ]}
-                      fill={isSelected ? "#00e6e6" : "red"}
-                      stroke={isSelected ? "#00e6e6" : "red"}
-                      strokeWidth={0}
-                      pointerLength={15 / stage.scale}
-                      pointerWidth={15 / stage.scale}
-                      listening={false}
-                    />
-                  );
+                  // THÊM "return" ở đây
+                  return (() => {
+                    // Khoảng hở giữa điểm và đầu mũi tên
+                    const arrowOffsetFromNode = 10 / stage.scale;
+                    // Chiều dài của thân mũi tên
+                    const arrowTailLength = 15 / stage.scale;
+
+                    // Tọa độ ĐẦU mũi tên (lùi lại một chút so với điểm cuối)
+                    const arrowHeadX = endPoint.x - ux * arrowOffsetFromNode;
+                    const arrowHeadY = endPoint.y - uy * arrowOffsetFromNode;
+
+                    // Tọa độ ĐUÔI mũi tên
+                    const arrowTailX =
+                      endPoint.x - ux * (arrowOffsetFromNode + arrowTailLength);
+                    const arrowTailY =
+                      endPoint.y - uy * (arrowOffsetFromNode + arrowTailLength);
+
+                    return (
+                      <Arrow
+                        points={[
+                          arrowTailX,
+                          arrowTailY,
+                          arrowHeadX,
+                          arrowHeadY,
+                        ]}
+                        fill={isSelected ? "#00e6e6" : "red"}
+                        strokeWidth={0}
+                        pointerLength={15 / stage.scale}
+                        pointerWidth={15 / stage.scale}
+                        listening={false}
+                      />
+                    );
+                  })();
                 } else {
-                  const dx_end = endPoint.x - lastControlPoint.x;
-                  const dy_end = endPoint.y - lastControlPoint.y;
+                  // <-- DÁN CODE MỚI VÀO KHỐI ELSE NÀY
+                  // --- LOGIC VẼ ĐƯỜNG CONG HAI CHIỀU ĐỐI XỨNG ---
+
+                  // Lấy control point gốc (giả sử chỉ có 1)
+                  const originalCp = flippedControlPoints[0];
+
+                  // Tính điểm giữa của 2 node để làm tâm đối xứng
+                  const midX = (startPoint.x + endPoint.x) / 2;
+                  const midY = (startPoint.y + endPoint.y) / 2;
+
+                  // Tính tọa độ control point đối xứng
+                  const mirroredCp = {
+                    x: 2 * midX - originalCp.x,
+                    y: 2 * midY - originalCp.y,
+                  };
+
+                  // Tạo data SVG cho đường cong thứ hai (ngược chiều)
+                  const mirroredSvgPathData = `M ${endPoint.x} ${endPoint.y} Q ${mirroredCp.x} ${mirroredCp.y} ${startPoint.x} ${startPoint.y}`;
+
+                  // Lấy hướng mũi tên cho cả hai đường
+                  const dx_end = endPoint.x - originalCp.x;
+                  const dy_end = endPoint.y - originalCp.y;
                   const dist_end = Math.sqrt(dx_end * dx_end + dy_end * dy_end);
                   const ux_end = dist_end === 0 ? 0 : dx_end / dist_end;
                   const uy_end = dist_end === 0 ? 0 : dy_end / dist_end;
 
-                  const dx_start = firstControlPoint.x - startPoint.x;
-                  const dy_start = firstControlPoint.y - startPoint.y;
+                  const dx_start = startPoint.x - mirroredCp.x;
+                  const dy_start = startPoint.y - mirroredCp.y;
                   const dist_start = Math.sqrt(
                     dx_start * dx_start + dy_start * dy_start
                   );
                   const ux_start = dist_start === 0 ? 0 : dx_start / dist_start;
                   const uy_start = dist_start === 0 ? 0 : dy_start / dist_start;
 
-                  return (
-                    <>
-                      <Arrow
-                        points={[
-                          endPoint.x - ux_end * 20,
-                          endPoint.y - uy_end * 20,
-                          endPoint.x,
-                          endPoint.y,
-                        ]}
-                        fill={isSelected ? "#00e6e6" : "red"}
-                        stroke={isSelected ? "#00e6e6" : "red"}
-                        strokeWidth={0}
-                        pointerLength={15 / stage.scale}
-                        pointerWidth={15 / stage.scale}
-                        listening={false}
-                      />
-                      <Arrow
-                        points={[
-                          startPoint.x + ux_start * 20,
-                          startPoint.y + uy_start * 20,
-                          startPoint.x,
-                          startPoint.y,
-                        ]}
-                        fill={isSelected ? "#00e6e6" : "red"}
-                        stroke={isSelected ? "#00e6e6" : "red"}
-                        strokeWidth={0}
-                        pointerLength={15 / stage.scale}
-                        pointerWidth={15 / stage.scale}
-                        listening={false}
-                      />
-                    </>
-                  );
+                  // --- Code mới cho đường cong HAI CHIỀU ---
+
+                  return (() => {
+                    const arrowOffsetFromNode = 10 / stage.scale;
+                    const arrowTailLength = 15 / stage.scale;
+
+                    // Tính toán cho mũi tên ở điểm cuối (endPoint)
+                    const headEndX = endPoint.x - ux_end * arrowOffsetFromNode;
+                    const headEndY = endPoint.y - uy_end * arrowOffsetFromNode;
+                    const tailEndX =
+                      endPoint.x -
+                      ux_end * (arrowOffsetFromNode + arrowTailLength);
+                    const tailEndY =
+                      endPoint.y -
+                      uy_end * (arrowOffsetFromNode + arrowTailLength);
+
+                    // Tính toán cho mũi tên ở điểm đầu (startPoint)
+                    // Chú ý: vector hướng từ điểm đầu nên ta dùng dấu CỘNG
+                    const headStartX =
+                      startPoint.x + ux_start * arrowOffsetFromNode;
+                    const headStartY =
+                      startPoint.y + uy_start * arrowOffsetFromNode;
+                    const tailStartX =
+                      startPoint.x +
+                      ux_start * (arrowOffsetFromNode + arrowTailLength);
+                    const tailStartY =
+                      startPoint.y +
+                      uy_start * (arrowOffsetFromNode + arrowTailLength);
+
+                    return (
+                      <>
+                        {/* 2 đường cong đối xứng (giữ nguyên) */}
+                        <Path
+                          data={svgPathData}
+                          stroke={isSelected ? "#00e6e6" : "red"}
+                          strokeWidth={2 / stage.scale}
+                          listening={false}
+                        />
+                        <Path
+                          data={mirroredSvgPathData}
+                          stroke={isSelected ? "#00e6e6" : "red"}
+                          strokeWidth={2 / stage.scale}
+                          hitStrokeWidth={15 / stage.scale}
+                          onClick={(e) => handleObjectClick(e, path)}
+                        />
+
+                        {/* Mũi tên 1 (đã lùi lại) */}
+                        <Arrow
+                          points={[tailEndX, tailEndY, headEndX, headEndY]}
+                          fill={isSelected ? "#00e6e6" : "red"}
+                          pointerLength={10 / stage.scale}
+                          pointerWidth={10 / stage.scale}
+                          listening={false}
+                        />
+                        {/* Mũi tên 2 (đã lùi lại) */}
+                        <Arrow
+                          points={[
+                            tailStartX,
+                            tailStartY,
+                            headStartX,
+                            headStartY,
+                          ]}
+                          fill={isSelected ? "#00e6e6" : "red"}
+                          pointerLength={10 / stage.scale}
+                          pointerWidth={10 / stage.scale}
+                          listening={false}
+                        />
+                      </>
+                    );
+                  })();
                 }
               })()}
             </React.Fragment>

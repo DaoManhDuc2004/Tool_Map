@@ -37,6 +37,7 @@ const MapEditor = ({
   onDeleteObject,
   onSelectedIdChange,
   selectedId,
+  onStageClick,
   stageRef,
   onDeletePointsInSelection,
   onDeletePathsInSelection,
@@ -576,8 +577,6 @@ const MapEditor = ({
       setSelectedObjectIds(ids);
     }
 
-    // Dòng này đã có sẵn, chỉ cần đảm bảo nó ở cuối cùng
-    setIsDrawing(false);
     // THÊM VÀO ĐẦU HÀM
     if (movingPointId) {
       setMovingPointId(null); // Kết thúc di chuyển
@@ -593,9 +592,11 @@ const MapEditor = ({
     }
     e.cancelBubble = true;
 
-    // Xử lý khi ở chế độ Chọn
     if (tool === "select") {
+      // 1. Vẫn chọn đối tượng để nó được highlight
       onSelectedIdChange(object.id);
+      // 2. Mở ngay lập tức bảng chỉnh sửa
+      onEditObject(object);
       return;
     }
 
@@ -617,55 +618,108 @@ const MapEditor = ({
             return;
           }
 
-          let newPath;
+          // --- BẮT ĐẦU LOGIC MỚI ĐÃ SỬA LỖI ---
 
+          // TRƯỜNG HỢP 1: ĐANG VẼ ĐƯỜNG THẲNG
           if (tool === "draw_path_straight") {
-            newPath = {
-              id: `path_${startPoint.id}_${endPoint.id}_${Date.now()}`,
-              from: startPoint.id,
-              to: endPoint.id,
-              type: "path",
-              pathType: "straight",
-              direction: "one-way",
-            };
-          } else {
-            // tool === "draw_path_curved"
-            // Tính toán 1 điểm điều khiển mặc định duy nhất
-            const p1 = startPoint;
-            const p2 = endPoint;
-            const midX = (p1.x + p2.x) / 2;
-            const midY = (p1.y + p2.y) / 2;
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const perpX = -dy;
-            const perpY = dx;
-            const dist = Math.sqrt(perpX * perpX + perpY * perpY);
-            const offsetAmount = 30; // Bạn có thể điều chỉnh độ cong mặc định ở đây
-            let cpX = midX;
-            let cpY = midY;
-            if (dist !== 0) {
-              const normPerpX = perpX / dist;
-              const normPerpY = perpY / dist;
-              cpX = midX + normPerpX * offsetAmount;
-              cpY = midY + normPerpY * offsetAmount;
+            // Tìm đường đi bất kỳ (xuôi hoặc ngược) giữa 2 điểm
+            const existingPath = paths.find((p) => {
+              const pStart = p.from || p.pointIds?.[0];
+              const pEnd = p.to || p.pointIds?.[p.pointIds.length - 1];
+              return (
+                (pStart === startPoint.id && pEnd === endPoint.id) ||
+                (pStart === endPoint.id && pEnd === startPoint.id)
+              );
+            });
+
+            // Nếu đã có đường
+            if (existingPath) {
+              // Và nó là 1 chiều, thì nâng cấp lên 2 chiều
+              if (existingPath.direction === "one-way") {
+                onObjectsChange((prev) => ({
+                  ...prev,
+                  paths: prev.paths.map((p) =>
+                    p.id === existingPath.id
+                      ? { ...p, direction: "two-way" }
+                      : p
+                  ),
+                }));
+                onContentChange();
+                alert("Đường đi đã được cập nhật thành hai chiều.");
+              } else {
+                // Nếu đã là 2 chiều rồi thì báo lỗi
+                alert("Đường đi hai chiều đã tồn tại giữa hai điểm này.");
+              }
+              // Nếu chưa có đường nào thì tạo mới
+            } else {
+              const newPath = {
+                id: `path_${startPoint.id}_${endPoint.id}_${Date.now()}`,
+                from: startPoint.id,
+                to: endPoint.id,
+                type: "path",
+                pathType: "straight",
+                direction: "one-way",
+              };
+              onObjectsChange((prev) => ({
+                ...prev,
+                paths: [...prev.paths, newPath],
+              }));
+              onContentChange();
             }
 
-            newPath = {
-              id: `path_curved_${Date.now()}`,
-              type: "path",
-              pathType: "curved",
-              direction: "one-way",
-              pointIds: [p1.id, p2.id],
-              controlPoints: [{ x: cpX, y: cpY }],
-            };
+            // TRƯỜNG HỢP 2: ĐANG VẼ ĐƯỜNG CONG
+          } else if (tool === "draw_path_curved") {
+            // Chỉ tìm đường đi chính xác theo hướng đang vẽ (A -> B)
+            const pathInSameDirectionExists = paths.some((p) => {
+              const pStart = p.from || p.pointIds?.[0];
+              const pEnd = p.to || p.pointIds?.[p.pointIds.length - 1];
+              return pStart === startPoint.id && pEnd === endPoint.id;
+            });
+
+            // Nếu đã có đường cùng chiều thì chặn
+            if (pathInSameDirectionExists) {
+              alert("Đã tồn tại đường cong theo hướng này.");
+              // Nếu chưa có thì tạo mới
+            } else {
+              // Logic tạo đường cong mặc định (giữ nguyên)
+              const p1 = startPoint,
+                p2 = endPoint;
+              const midX = (p1.x + p2.x) / 2,
+                midY = (p1.y + p2.y) / 2;
+              const dx = p2.x - p1.x,
+                dy = p2.y - p1.y;
+              const perpX = -dy,
+                perpY = dx;
+              const dist = Math.sqrt(perpX * perpX + perpY * perpY);
+              const offsetAmount = 30;
+              let cpX = midX,
+                cpY = midY;
+              if (dist !== 0) {
+                const normPerpX = perpX / dist,
+                  normPerpY = perpY / dist;
+                cpX = midX + normPerpX * offsetAmount;
+                cpY = midY + normPerpY * offsetAmount;
+              }
+              const newPath = {
+                id: `path_curved_${Date.now()}`,
+                type: "path",
+                pathType: "curved",
+                direction: "one-way",
+                pointIds: [p1.id, p2.id],
+                controlPoints: [{ x: cpX, y: cpY }],
+              };
+              onObjectsChange((prev) => ({
+                ...prev,
+                paths: [...prev.paths, newPath],
+              }));
+              onContentChange();
+            }
           }
 
-          onObjectsChange((prev) => ({
-            ...prev,
-            paths: [...prev.paths, newPath],
-          }));
-          onContentChange();
-          setPathStartPointId(null); // Reset để chuẩn bị vẽ đường tiếp theo
+          // Reset sau khi hoàn thành
+          setPathStartPointId(null);
+
+          // --- KẾT THÚC LOGIC MỚI ---
         }
       }
     }
@@ -698,6 +752,9 @@ const MapEditor = ({
   const handleStageClick = (e) => {
     const konvaStage = e.target.getStage();
     if (e.target !== konvaStage) return;
+    if (onStageClick) {
+      onStageClick();
+    }
     if (contextMenu.visible) {
       setContextMenu({ ...contextMenu, visible: false });
     }

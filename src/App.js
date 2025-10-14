@@ -25,9 +25,6 @@ function App() {
   const [fileHandle, setFileHandle] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
-  // THÊM MỚI: Ref cho input mở file .json
-  const mapDataInputRef = useRef(null);
-
   const resetMapObjects = () => {
     setAllObjects({ walls: [], zones: [], points: [], paths: [] });
     setIsDirty(false);
@@ -45,6 +42,11 @@ function App() {
     } else {
       action(); // Nếu không có gì thay đổi, thực hiện hành động ngay lập tức
     }
+  };
+
+  const handleCloseEditor = () => {
+    setIsEditorOpen(false);
+    setSelectedId(null); // Bỏ chọn đối tượng luôn cho nhất quán
   };
 
   const handleSaveMap = async () => {
@@ -571,6 +573,7 @@ function App() {
             onDeleteObject={handleDeleteObject}
             selectedId={selectedId}
             onSelectedIdChange={setSelectedId}
+            onStageClick={handleCloseEditor}
             stageRef={stageRef}
             onDeletePointsInSelection={handleDeletePointsInSelection}
             onDeletePathsInSelection={handleDeletePathsInSelection}
