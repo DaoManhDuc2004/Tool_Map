@@ -1,0 +1,59 @@
+.level-manager-modal .modal-content {
+  width: 600px;
+}
+
+.level-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.level-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.level-item:last-child {
+  border-bottom: none;
+}
+
+.level-order {
+  font-weight: bold;
+}
+
+.level-name-input {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.level-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.level-actions .delete-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.add-level-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 20px;
+}

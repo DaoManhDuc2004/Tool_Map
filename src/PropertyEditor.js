@@ -280,13 +280,15 @@ const PropertyEditor = ({
     setCoordsInMeters((prev) => ({ ...prev, [name]: value }));
   };
 
+  // THAY THẾ TOÀN BỘ HÀM NÀY
   const handleSave = () => {
     if (isMultiple) {
-      // Lưu cho nhiều đối tượng (không đổi)
+      // Lưu cho nhiều đối tượng
       const changes = {};
       Object.keys(formData).forEach((key) => {
         if (!placeholders[key] || placeholders[key] === "") {
-          if (key === "elevation") {
+          // --- SỬA LẠI DÒNG IF NÀY ---
+          if (key === "elevation" || key === "slope") {
             changes[key] = parseFloat(formData[key]) || 0;
           } else {
             changes[key] = formData[key];
@@ -298,14 +300,15 @@ const PropertyEditor = ({
       // Lưu cho một đối tượng
       const dataToSave = { ...formData };
       dataToSave.elevation = parseFloat(dataToSave.elevation) || 0;
+      // --- THÊM DÒNG NÀY ---
+      dataToSave.slope = parseFloat(dataToSave.slope) || 0;
 
-      // <-- KHÔI PHỤC LẠI: Logic chuyển đổi tọa độ mét thành pixel trước khi lưu
+      // Logic chuyển đổi tọa độ (không đổi)
       if (dataToSave.type === "point") {
         const pixelsPerMeter = mapConfig?.pixelsPerMeter || 1;
         const x_meters = parseFloat(coordsInMeters.x) || 0;
         const y_meters = parseFloat(coordsInMeters.y) || 0;
 
-        // Cập nhật lại tọa độ pixel
         dataToSave.x = x_meters * pixelsPerMeter;
         dataToSave.y = y_meters * pixelsPerMeter;
       }
@@ -382,29 +385,44 @@ const PropertyEditor = ({
     </>
   );
 
+  // THAY THẾ TOÀN BỘ HÀM NÀY
   const renderFieldsForPath = () => {
-    // (Phần này không thay đổi)
-    if (formData.pathType === "straight") {
-      return (
-        <div className="form-group">
-          <label>Hướng di chuyển (Direction)</label>
-          <select
-            name="direction"
-            value={formData.direction || "one-way"}
-            onChange={handleChange}
-            placeholder={placeholders.direction}
-          >
-            <option value="one-way">Một chiều</option>
-            <option value="two-way">Hai chiều</option>
-          </select>
-        </div>
-      );
-    }
     return (
-      <div className="form-group">
-        <label>Hướng di chuyển (Direction)</label>
-        <input type="text" value="Một chiều (mặc định)" disabled />
-      </div>
+      <>
+        {/* Phần hiển thị Hướng di chuyển (không đổi) */}
+        {formData.pathType === "straight" ? (
+          <div className="form-group">
+            <label>Hướng di chuyển (Direction)</label>
+            <select
+              name="direction"
+              value={formData.direction || "one-way"}
+              onChange={handleChange}
+              placeholder={placeholders.direction}
+            >
+              <option value="one-way">Một chiều</option>
+              <option value="two-way">Hai chiều</option>
+            </select>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label>Hướng di chuyển (Direction)</label>
+            <input type="text" value="Một chiều (mặc định)" disabled />
+          </div>
+        )}
+
+        {/* --- THÊM Ô INPUT MỚI CHO ĐỘ DỐC --- */}
+        <div className="form-group">
+          <label>Độ dốc (Slope)</label>
+          <input
+            type="number"
+            name="slope"
+            value={formData.slope ?? 0} // Hiển thị giá trị slope, mặc định là 0
+            onChange={handleChange}
+            placeholder={placeholders.slope}
+            step="0.1"
+          />
+        </div>
+      </>
     );
   };
 

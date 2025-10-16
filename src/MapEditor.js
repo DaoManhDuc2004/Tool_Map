@@ -41,6 +41,7 @@ const MapEditor = ({
   stageRef,
   onDeletePointsInSelection,
   onDeletePathsInSelection,
+  currentLevelId,
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -147,16 +148,12 @@ const MapEditor = ({
   // MapEditor.js
 
   useEffect(() => {
-    // Bỏ dòng khai báo biến cục bộ ở đây
-    if (image) {
-      resetStage(image.width, image.height);
-    } else if (mapConfig) {
-      // Dùng biến "pixelsPerMeter" đã được khai báo ở đầu component
-      const contentWidth = mapConfig.width * pixelsPerMeter;
-      const contentHeight = mapConfig.height * pixelsPerMeter;
+    // Luôn gọi resetStage với contentWidth và contentHeight đã được tính toán ở đầu component
+    // để đảm bảo tính nhất quán.
+    if (contentWidth > 0 && contentHeight > 0) {
       resetStage(contentWidth, contentHeight);
     }
-  }, [image, mapConfig, size, pixelsPerMeter]); // Thêm pixelsPerMeter vào dependencies
+  }, [contentWidth, contentHeight, size]); // Chạy lại mỗi khi kích thước nội dung hoặc cửa sổ thay đổi
 
   // THAY ĐỔI: Khi đổi công cụ, reset các state liên quan
   useEffect(() => {
@@ -352,6 +349,7 @@ const MapEditor = ({
               height: 0,
               fill: fillColors[tool],
               type: "zone",
+              levelId: currentLevelId,
             },
           ],
         };
@@ -592,6 +590,29 @@ const MapEditor = ({
     }
     e.cancelBubble = true;
 
+    if (tool === "measure") {
+      // Tạo một điểm mới từ tọa độ của node đã click (hệ bottom-left)
+      const snappedPoint = { x: object.x, y: object.y };
+
+      // Nếu đây là điểm bắt đầu đo
+      if (measurement.points.length === 0) {
+        setMeasurement({ points: [snappedPoint, snappedPoint], distance: 0 });
+      } else {
+        // Nếu đây là điểm kết thúc đo
+        const startPoint = measurement.points[0];
+        const dx = snappedPoint.x - startPoint.x;
+        const dy = snappedPoint.y - startPoint.y;
+        const distInPixels = Math.sqrt(dx * dx + dy * dy);
+        const distInMeters = distInPixels / pixelsPerMeter;
+
+        setMeasurement({
+          points: [startPoint, snappedPoint],
+          distance: distInMeters,
+        });
+      }
+      return; // Dừng lại, không chạy logic của các công cụ khác
+    }
+
     if (tool === "select") {
       // 1. Vẫn chọn đối tượng để nó được highlight
       onSelectedIdChange(object.id);
@@ -659,6 +680,8 @@ const MapEditor = ({
                 type: "path",
                 pathType: "straight",
                 direction: "one-way",
+                slope: 0,
+                levelId: currentLevelId,
               };
               onObjectsChange((prev) => ({
                 ...prev,
@@ -707,6 +730,8 @@ const MapEditor = ({
                 direction: "one-way",
                 pointIds: [p1.id, p2.id],
                 controlPoints: [{ x: cpX, y: cpY }],
+                slope: 0,
+                levelId: currentLevelId,
               };
               onObjectsChange((prev) => ({
                 ...prev,
@@ -791,6 +816,7 @@ const MapEditor = ({
         type: "point",
         nodeType: "running area",
         nodeName: `Point-${id.substring(6)}`,
+        levelId: currentLevelId,
       };
 
       onObjectsChange((prev) => ({

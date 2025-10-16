@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import "./App.css";
 import MapEditor from "./MapEditor";
 import NewMapModal from "./NewMapModal";
 import PropertyEditor from "./PropertyEditor";
+import LevelManagerModal from "./components/MapEditorComponents/LevelManagerModal";
 
 function App() {
   const stageRef = useRef(null);
@@ -12,7 +13,8 @@ function App() {
   const [mapConfig, setMapConfig] = useState(null);
   const [siteId, setSiteId] = useState("");
   const [siteName, setSiteName] = useState("");
-
+  const [levels, setLevels] = useState([]);
+  const [currentLevelId, setCurrentLevelId] = useState(null);
   const [allObjects, setAllObjects] = useState({
     walls: [],
     zones: [],
@@ -20,7 +22,28 @@ function App() {
     paths: [],
   });
 
+  const visibleObjects = useMemo(() => {
+    // Nếu không có tầng nào được chọn, trả về đối tượng rỗng
+    if (!currentLevelId) return { walls: [], zones: [], points: [], paths: [] };
+
+    // Lọc từng loại đối tượng dựa trên levelId
+    return {
+      walls: allObjects.walls.filter((w) => w.levelId === currentLevelId),
+      zones: allObjects.zones.filter((z) => z.levelId === currentLevelId),
+      points: allObjects.points.filter((p) => p.levelId === currentLevelId),
+      paths: allObjects.paths.filter((p) => p.levelId === currentLevelId),
+    };
+  }, [allObjects, currentLevelId]);
+
+  const currentBackgroundImage = useMemo(() => {
+    if (!currentLevelId || !levels) return null;
+
+    const currentLevel = levels.find((l) => l.levelId === currentLevelId);
+    return currentLevel?.backgroundImage || null; // Trả về ảnh nền của tầng đó
+  }, [currentLevelId, levels]);
+
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isLevelManagerOpen, setIsLevelManagerOpen] = useState(false);
   const [editingSelection, setEditingSelection] = useState(null);
   const [fileHandle, setFileHandle] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -141,7 +164,7 @@ function App() {
             siteId: siteId,
             siteName: siteName,
             mapConfig: mapConfig,
-            backgroundImage: map2D,
+            levels: levels,
             objects: objectsInMeters, // <-- Sử dụng đối tượng đã được chuyển đổi
           };
           const jsonString = JSON.stringify(saveData, null, 2);
@@ -245,7 +268,7 @@ function App() {
           // Kiểm tra và cập nhật state (giữ nguyên)
           if (
             loadedData.objects &&
-            loadedData.backgroundImage !== undefined &&
+            loadedData.levels &&
             loadedData.mapConfig && // Đảm bảo mapConfig tồn tại
             loadedData.mapConfig.pixelsPerMeter // và có giá trị pixelsPerMeter
           ) {
@@ -288,8 +311,9 @@ function App() {
             setSiteId(loadedData.siteId || "");
             setSiteName(loadedData.siteName || "");
             setMapConfig(loadedData.mapConfig);
-            setMap2D(loadedData.backgroundImage);
-            setAllObjects(objectsInPixels); // <-- Sử dụng đối tượng đã được chuyển đổi
+            setAllObjects(objectsInPixels);
+            setLevels(loadedData.levels || []);
+            setCurrentLevelId(loadedData.levels?.[0]?.levelId || null);
             setIsDirty(false);
             alert("Đã mở bản đồ thành công!");
           } else {
@@ -356,17 +380,18 @@ function App() {
     }
   };
 
-  const handleCreateMap = (config, bgImage) => {
+  const handleCreateMap = (config, initialLevels) => {
     setFileHandle(null);
     setSiteId("");
     setSiteName("");
-
-    // Dùng trực tiếp config nhận được từ Modal, không tính toán gì thêm
-    // vì nó đã luôn là mét.
     setMapConfig(config);
-
     resetMapObjects();
-    setMap2D(bgImage || null);
+
+    // --- THAY ĐỔI Ở ĐÂY ---
+    setLevels(initialLevels || []); // Lưu danh sách các tầng (lúc này chỉ có 1 tầng)
+    setCurrentLevelId(initialLevels?.[0]?.levelId || null); // Chọn tầng đầu tiên đó
+    // --------------------
+
     setIsModalOpen(false);
   };
 
@@ -421,6 +446,74 @@ function App() {
     setIsDirty(true);
     setIsEditorOpen(false);
   };
+
+  // src/App.js
+
+  const handleLevelsChange = (updatedLevels) => {
+    // 1. Tìm các tầng có ảnh nền bị THAY ĐỔI
+    const imageChangedLevelIds = levels
+      .filter((oldLevel) => {
+        const newLevel = updatedLevels.find(
+          (nl) => nl.levelId === oldLevel.levelId
+        );
+        // Kiểm tra xem tầng đó có còn tồn tại không và ảnh nền có khác không
+        return (
+          newLevel && newLevel.backgroundImage !== oldLevel.backgroundImage
+        );
+      })
+      .map((l) => l.levelId);
+
+    // 2. Tìm các tầng bị XÓA HOÀN TOÀN (logic cũ)
+    const deletedLevelIds = levels
+      .filter(
+        (oldLevel) =>
+          !updatedLevels.some(
+            (newLevel) => newLevel.levelId === oldLevel.levelId
+          )
+      )
+      .map((l) => l.levelId);
+
+    // 3. Gộp 2 danh sách ID cần xóa đối tượng lại
+    // Dùng Set để tránh trùng lặp nếu một tầng vừa bị xóa vừa bị thay ảnh
+    const levelIdsToClearObjects = [
+      ...new Set([...imageChangedLevelIds, ...deletedLevelIds]),
+    ];
+
+    // 4. Nếu có tầng cần xóa đối tượng, thực hiện hành động
+    if (levelIdsToClearObjects.length > 0) {
+      // QUAN TRỌNG: Hỏi xác nhận người dùng trước khi xóa dữ liệu
+      if (imageChangedLevelIds.length > 0) {
+        if (
+          !window.confirm(
+            "Bạn có chắc chắn muốn thay đổi ảnh nền không? Tất cả các điểm và đường đi trên tầng này sẽ bị XÓA."
+          )
+        ) {
+          return; // Nếu người dùng nhấn "Cancel", không làm gì cả
+        }
+      }
+
+      // Tiến hành xóa tất cả các đối tượng thuộc các tầng đã xác định
+      setAllObjects((prev) => ({
+        walls: prev.walls.filter(
+          (w) => !levelIdsToClearObjects.includes(w.levelId)
+        ),
+        zones: prev.zones.filter(
+          (z) => !levelIdsToClearObjects.includes(z.levelId)
+        ),
+        points: prev.points.filter(
+          (p) => !levelIdsToClearObjects.includes(p.levelId)
+        ),
+        paths: prev.paths.filter(
+          (p) => !levelIdsToClearObjects.includes(p.levelId)
+        ),
+      }));
+    }
+
+    // 5. Cuối cùng, cập nhật lại danh sách các tầng
+    setLevels(updatedLevels);
+    setIsDirty(true);
+  };
+
   // Thay thế toàn bộ hàm này trong file App.js
   const handleDeleteObject = (objectId) => {
     if (!objectId) return;
@@ -515,7 +608,8 @@ function App() {
   return (
     <div className="app-container">
       <div className="controls">
-        <div className="control-row">
+        {/* Nhóm 1: Tiêu đề và các nút chính */}
+        <div className="control-group">
           <h1>2D Map Editor</h1>
           <button onClick={() => confirmAndExecute(handleNewMap)}>
             Tạo Map mới
@@ -524,17 +618,17 @@ function App() {
             Mở File
           </button>
           {isDirty && (
-            <button
-              onClick={handleSaveMap}
-              style={{ backgroundColor: "#4CAF50" }}
-            >
+            <button onClick={handleSaveMap} className="btn-save">
+              {" "}
+              {/* Thêm class mới */}
               Lưu
             </button>
           )}
           {mapConfig && <button onClick={handleExportImage}>Export</button>}
         </div>
 
-        <div className="control-row">
+        {/* Nhóm 2: Thông tin Site và Tầng */}
+        <div className="control-group">
           <div className="input-group">
             <input
               type="text"
@@ -544,8 +638,8 @@ function App() {
                 setSiteId(e.target.value);
                 setIsDirty(true);
               }}
-              placeholder="Site ID (ví dụ: KHO_01)"
-              style={{ flex: 1 }}
+              placeholder="Site ID"
+              style={{ width: "150px" }}
             />
             <input
               type="text"
@@ -555,18 +649,41 @@ function App() {
                 setSiteName(e.target.value);
                 setIsDirty(true);
               }}
-              placeholder="Site Name (ví dụ: Kho Hà Nội)"
-              style={{ flex: 2 }}
+              placeholder="Site Name"
+              style={{ width: "250px" }}
             />
           </div>
+
+          {levels.length > 0 && (
+            <div className="input-group">
+              <label>Tầng:</label>
+              <select
+                value={currentLevelId || ""}
+                onChange={(e) => setCurrentLevelId(e.target.value)}
+              >
+                {levels.map((level) => (
+                  <option key={level.levelId} value={level.levelId}>
+                    {level.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="level-manage-btn"
+                onClick={() => setIsLevelManagerOpen(true)}
+                title="Thêm/Sửa/Xóa tầng"
+              >
+                ⚙️
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div className="viewer-container">
         {mapConfig && (
           <MapEditor
-            backgroundImage={map2D}
+            backgroundImage={currentBackgroundImage}
             mapConfig={mapConfig}
-            objects={allObjects}
+            objects={visibleObjects}
             onObjectsChange={setAllObjects}
             onEditObject={handleOpenEditor}
             onContentChange={() => setIsDirty(true)}
@@ -577,6 +694,7 @@ function App() {
             stageRef={stageRef}
             onDeletePointsInSelection={handleDeletePointsInSelection}
             onDeletePathsInSelection={handleDeletePathsInSelection}
+            currentLevelId={currentLevelId}
           />
         )}
         {isEditorOpen && (
@@ -593,6 +711,12 @@ function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCreate={handleCreateMap}
+      />
+      <LevelManagerModal
+        isOpen={isLevelManagerOpen}
+        onClose={() => setIsLevelManagerOpen(false)}
+        levels={levels}
+        onLevelsChange={handleLevelsChange}
       />
     </div>
   );

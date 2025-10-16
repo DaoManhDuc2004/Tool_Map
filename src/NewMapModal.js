@@ -37,6 +37,8 @@ const NewMapModal = ({ isOpen, onClose, onCreate }) => {
     }
   };
 
+  // src/NewMapModal.js
+
   const handleSubmit = () => {
     // Chuyển đổi chuỗi thành số khi bấm "Tạo"
     const finalConfig = {
@@ -54,12 +56,27 @@ const NewMapModal = ({ isOpen, onClose, onCreate }) => {
       return;
     }
 
-    if (mapType === "blank" || (mapType === "image" && backgroundImage)) {
-      onCreate(finalConfig, backgroundImage);
-      resetState();
-    } else {
+    if (mapType === "image" && !backgroundImage) {
       alert("Vui lòng chọn một file ảnh để tạo map.");
+      return;
     }
+
+    const firstLevelId = `L${Date.now()}`;
+
+    // 2. Tạo đối tượng cho tầng đầu tiên với ID động
+    const firstLevel = {
+      levelId: firstLevelId, // <-- SỬA Ở ĐÂY
+      name: "Tầng 1", // Giữ tên là 'Tầng 1' cho dễ hiểu
+      order: 1,
+      backgroundImage: mapType === "image" ? backgroundImage : null,
+    };
+
+    // 2. Gọi hàm onCreate với một mảng chứa tầng đầu tiên đó
+    onCreate(finalConfig, [firstLevel]);
+
+    resetState();
+
+    // --- KẾT THÚC THAY ĐỔI LOGIC ---
   };
 
   const resetState = () => {
