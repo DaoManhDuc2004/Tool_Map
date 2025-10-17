@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import "./App.css";
 import MapEditor from "./MapEditor";
-import NewMapModal from "./NewMapModal";
-import PropertyEditor from "./PropertyEditor";
+import NewMapModal from "./components/Menu/NewMapModal";
+import PropertyEditor from "./components/MapEditorComponents/PropertyEditor";
 import LevelManagerModal from "./components/MapEditorComponents/LevelManagerModal";
 
 function App() {
@@ -110,7 +110,6 @@ function App() {
     }
     const fileExtension = handle.name.split(".").pop().toLowerCase();
 
-    // --- Bắt đầu tạo nội dung và lưu file ---
     try {
       const fileExtension = handle.name.split(".").pop();
       const writable = await handle.createWritable();
@@ -127,7 +126,6 @@ function App() {
             return;
           }
 
-          // Tạo một bản sao của các đối tượng và chuyển đổi tọa độ
           const objectsInMeters = {
             walls: allObjects.walls.map((wall) => ({
               ...wall,
@@ -473,7 +471,6 @@ function App() {
       )
       .map((l) => l.levelId);
 
-    // 3. Gộp 2 danh sách ID cần xóa đối tượng lại
     // Dùng Set để tránh trùng lặp nếu một tầng vừa bị xóa vừa bị thay ảnh
     const levelIdsToClearObjects = [
       ...new Set([...imageChangedLevelIds, ...deletedLevelIds]),

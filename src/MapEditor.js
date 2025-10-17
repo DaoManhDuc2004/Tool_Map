@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Stage, Layer, Image, Rect, Group } from "react-konva";
-import "./MapEditor.css";
+import "./CSS/MapEditor.css";
 
 import PointLayer from "./components/MapEditorComponents/PointLayer";
 import PathLayer from "./components/MapEditorComponents/PathLayer";
@@ -9,6 +9,7 @@ import MeasurementLayer from "./components/MapEditorComponents/MeasurementLayer"
 import Crosshair from "./components/MapEditorComponents/Crosshair";
 import PointMenu from "./components/Menu/PointMenu";
 import AreaContextMenu from "./components/Menu/AreaContextMenu";
+import HoverTooltip from "./components/MapEditorComponents/HoverTooltip";
 
 const useImage = (url) => {
   const [image, setImage] = useState(null);
@@ -26,7 +27,6 @@ const useImage = (url) => {
   return image;
 };
 
-// THAY ĐỔI: Component nhận props đầy đủ từ App.js
 const MapEditor = ({
   backgroundImage,
   onContentChange,
@@ -47,29 +47,24 @@ const MapEditor = ({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const image = useImage(backgroundImage);
 
-  // --- BẮT ĐẦU KHỐI CODE THAY THẾ ---
-
   // Luôn đảm bảo mapConfig không phải là null trước khi truy cập
   const pixelsPerMeter = mapConfig?.pixelsPerMeter || 20;
 
   // Tính toán chiều rộng và chiều cao của nội dung map
   const contentWidth = mapConfig
-    ? mapConfig.width * pixelsPerMeter // <-- Ưu tiên nhánh này trước
+    ? mapConfig.width * pixelsPerMeter
     : image
     ? image.width
     : 0;
 
   const contentHeight = mapConfig
-    ? mapConfig.height * pixelsPerMeter // <-- Ưu tiên nhánh này trước
+    ? mapConfig.height * pixelsPerMeter
     : image
     ? image.height
     : 0;
 
-  // THAY ĐỔI: Lấy dữ liệu từ props thay vì state nội bộ
   const { walls, zones, points, paths } = objects;
 
-  // THAY ĐỔI: State cho việc chọn đối tượng và vẽ đường đi
-  //const [selectedId, setSelectedId] = useState(null);
   const [pathStartPointId, setPathStartPointId] = useState(null);
   const [drawingPathPoints, setDrawingPathPoints] = useState([]);
   const [isStageDraggable, setIsStageDraggable] = useState(true);
@@ -97,6 +92,12 @@ const MapEditor = ({
   });
   const [isMovingSelection, setIsMovingSelection] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [hoverTooltip, setHoverTooltip] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    content: null,
+  });
 
   useEffect(() => {
     if (containerRef.current) {
@@ -148,28 +149,23 @@ const MapEditor = ({
   // MapEditor.js
 
   useEffect(() => {
-    // Luôn gọi resetStage với contentWidth và contentHeight đã được tính toán ở đầu component
-    // để đảm bảo tính nhất quán.
     if (contentWidth > 0 && contentHeight > 0) {
       resetStage(contentWidth, contentHeight);
     }
-  }, [contentWidth, contentHeight, size]); // Chạy lại mỗi khi kích thước nội dung hoặc cửa sổ thay đổi
+  }, [contentWidth, contentHeight, size]);
 
-  // THAY ĐỔI: Khi đổi công cụ, reset các state liên quan
   useEffect(() => {
     onSelectedIdChange(null);
     setPathStartPointId(null);
     setDrawingPathPoints([]);
   }, [tool]);
   useEffect(() => {
-    // Reset trạng thái đo khi chuyển công cụ
     if (tool !== "measure") {
       setMeasurement({ points: [], distance: 0 });
     }
   }, [tool]);
 
   const handleWheel = (e) => {
-    // ... (Không đổi)
     e.evt.preventDefault();
     const scaleBy = 1.05;
     const stage = e.target.getStage();
@@ -196,25 +192,14 @@ const MapEditor = ({
     let newX = stageNode.x();
     let newY = stageNode.y();
 
-    // Kích thước của khung nhìn (viewport)
     const stageWidth = size.width;
     const stageHeight = size.height;
-
-    // Đặt một khoảng đệm để người dùng không thể kéo map sát rạt vào cạnh
     const padding = 50;
-
-    // Tính toán giới hạn cho tọa độ X
-    // Giới hạn phải: không cho mép trái của map đi qua cạnh phải của viewport
     const maxX = padding;
-    // Giới hạn trái: không cho mép phải của map đi qua cạnh trái của viewport
     const minX = stageWidth - contentWidth * scale - padding;
-
-    // Tính toán giới hạn cho tọa độ Y
     const maxY = padding;
     const minY = stageHeight - contentHeight * scale - padding;
 
-    // Áp dụng giới hạn
-    // Nếu nội dung nhỏ hơn màn hình thì không giới hạn để có thể căn giữa
     if (contentWidth * scale > stageWidth) {
       newX = Math.max(minX, Math.min(newX, maxX));
     }
@@ -229,18 +214,13 @@ const MapEditor = ({
     });
   };
 
-  // THAY ĐỔI: Hàm tìm đối tượng trong state tổng
   const findObjectById = (id) => {
     if (!id) return null;
-    // Gộp tất cả các mảng đối tượng lại để tìm
     const all = [...walls, ...zones, ...points, ...paths];
     return all.find((obj) => obj.id === id);
   };
   const isPointInRect = (point, rect) => {
-    // Chuyển đổi tọa độ Y của điểm (bottom-left) sang hệ top-left để so sánh
     const pointYTopLeft = contentHeight - point.y;
-
-    // Chuẩn hóa tọa độ của hình chữ nhật để width/height luôn dương
     const rX1 = Math.min(rect.x, rect.x + rect.width);
     const rX2 = Math.max(rect.x, rect.x + rect.width);
     const rY1 = Math.min(rect.y, rect.y + rect.height);
@@ -269,7 +249,6 @@ const MapEditor = ({
     }
 
     if (tool === "area_select") {
-      // Kiểm tra xem có click vào trong vùng đã chọn để di chuyển không
       if (
         selectionRect.visible &&
         isPointInRect({ x: point.x, y: contentHeight - point.y }, selectionRect)
@@ -277,7 +256,6 @@ const MapEditor = ({
         setIsMovingSelection(true);
         setDragStartPos(point);
       } else {
-        // Nếu không thì bắt đầu vẽ vùng chọn mới
         setIsDrawing(true);
         setSelectionRect({
           x: point.x,
@@ -286,16 +264,15 @@ const MapEditor = ({
           height: 0,
           visible: true,
         });
-        setSelectedObjectIds([]); // Xóa lựa chọn cũ
+        setSelectedObjectIds([]);
       }
-      return; // Dừng lại để không chạy các logic khác
+      return;
     }
 
     if (tool === "measure") {
-      // Mỗi lần click sẽ là một lần đo mới
       const flippedPoint = { ...point, y: contentHeight - point.y };
       setMeasurement({ points: [flippedPoint, flippedPoint], distance: 0 });
-      return; // Dừng lại để không chạy code vẽ ở dưới
+      return;
     }
     if (e.target !== konvaStage) {
       return;
@@ -303,8 +280,6 @@ const MapEditor = ({
 
     const drawingTools = ["draw_wall", "draw_rect", "draw_nogo", "draw_slow"];
     if (!drawingTools.includes(tool)) return;
-
-    // === BẮT ĐẦU KIỂM TRA RANH GIỚI ===
     if (
       point.x < 0 ||
       point.x > contentWidth ||
@@ -312,12 +287,9 @@ const MapEditor = ({
       point.y > contentHeight
     ) {
       alert("Không thể bắt đầu vẽ ở ngoài phạm vi bản đồ.");
-      return; // Dừng lại, không cho vẽ
+      return;
     }
-    // === KẾT THÚC KIỂM TRA RANH GIỚI ===
-
     setIsDrawing(true);
-
     const id = `${tool}_${Date.now()}`;
     const flippedY = contentHeight - point.y;
 
@@ -359,7 +331,27 @@ const MapEditor = ({
     onContentChange();
   };
 
-  // File: MapEditor.js
+  const handlePointMouseOver = (e, point) => {
+    const pos = e.target.getStage().getPointerPosition();
+    const x_m = (point.x / pixelsPerMeter).toFixed(2);
+    const y_m = (point.y / pixelsPerMeter).toFixed(2);
+
+    setHoverTooltip({
+      visible: true,
+      x: pos.x,
+      y: pos.y,
+      content: {
+        id: point.id,
+        nodeName: point.nodeName,
+        x_m: x_m,
+        y_m: y_m,
+      },
+    });
+  };
+
+  const handlePointMouseOut = () => {
+    setHoverTooltip({ visible: false, x: 0, y: 0, content: null });
+  };
 
   const handleMouseMove = useCallback(
     (e) => {
@@ -370,13 +362,14 @@ const MapEditor = ({
         y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
       };
       if (movingPointId) {
-        // Giới hạn di chuyển trong phạm vi bản đồ
         const finalX = Math.max(0, Math.min(point.x, contentWidth));
         const finalY = Math.max(0, Math.min(point.y, contentHeight));
-
-        // Lật tọa độ Y để lưu vào state
         const finalY_flipped = contentHeight - finalY;
-
+        setCrosshair({
+          x: finalX,
+          y: finalY_flipped,
+          visible: true,
+        });
         onObjectsChange((prev) => ({
           ...prev,
           points: prev.points.map((p) =>
@@ -384,36 +377,32 @@ const MapEditor = ({
           ),
         }));
         onContentChange();
-        return; // Dừng lại để không chạy các logic khác
+        return;
       }
 
       if (isMovingSelection) {
         const dx = point.x - dragStartPos.x;
-        const dy = point.y - dragStartPos.y; // dy > 0 khi chuột đi xuống
+        const dy = point.y - dragStartPos.y;
         setSelectionRect((prev) => ({
-          ...prev, // Giữ nguyên width, height, visible
+          ...prev,
           x: prev.x + dx,
           y: prev.y + dy,
         }));
 
         onObjectsChange((prev) => {
-          const newObjects = JSON.parse(JSON.stringify(prev)); // Sao chép sâu
+          const newObjects = JSON.parse(JSON.stringify(prev));
 
           selectedObjectIds.forEach((id) => {
-            // Di chuyển điểm
             const pIndex = newObjects.points.findIndex((p) => p.id === id);
             if (pIndex !== -1) {
               newObjects.points[pIndex].x += dx;
-              // Tọa độ Y trong state là bottom-left, nên Y phải giảm khi chuột đi xuống
               newObjects.points[pIndex].y -= dy;
             }
-
-            // Di chuyển control points của đường cong
             const pathIndex = newObjects.paths.findIndex((p) => p.id === id);
             if (pathIndex !== -1 && newObjects.paths[pathIndex].controlPoints) {
               newObjects.paths[pathIndex].controlPoints.forEach((cp) => {
                 cp.x += dx;
-                cp.y -= dy; // Tương tự như trên
+                cp.y -= dy;
               });
             }
           });
@@ -425,7 +414,6 @@ const MapEditor = ({
         return;
       }
 
-      // --- LOGIC 2: CẬP NHẬT KÍCH THƯỚC VÙNG CHỌN KHI ĐANG VẼ ---
       if (isDrawing && tool === "area_select") {
         setSelectionRect((prev) => ({
           ...prev,
@@ -440,14 +428,12 @@ const MapEditor = ({
           y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
         };
 
-        // Cập nhật state của crosshair với tọa độ đã lật
         setCrosshair({
           x: mousePoint.x,
-          y: contentHeight - mousePoint.y, // Tọa độ bottom-left
+          y: contentHeight - mousePoint.y,
           visible: true,
         });
       } else if (crosshair.visible) {
-        // Ẩn crosshair đi nếu chuyển sang công cụ khác
         setCrosshair({ ...crosshair, visible: false });
       }
 
@@ -456,30 +442,23 @@ const MapEditor = ({
           x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
           y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
         };
-
-        // SỬA LẠI: Lật tọa độ Y của chuột
         const flippedMousePoint = {
           ...mousePoint,
           y: contentHeight - mousePoint.y,
         };
 
-        const startPoint = measurement.points[0]; // Điểm này đã là hệ bottom-left
-
-        // Tính khoảng cách trên hệ tọa độ MỚI (bottom-left)
+        const startPoint = measurement.points[0];
         const dx = flippedMousePoint.x - startPoint.x;
         const dy = flippedMousePoint.y - startPoint.y; // Y đã được đồng bộ
         const distInPixels = Math.sqrt(dx * dx + dy * dy);
         const distInMeters = distInPixels / pixelsPerMeter;
 
         setMeasurement({
-          points: [startPoint, flippedMousePoint], // Lưu 2 điểm đều là hệ bottom-left
+          points: [startPoint, flippedMousePoint],
           distance: distInMeters,
         });
         return;
       }
-
-      // File: MapEditor.js (bên trong useCallback của handleMouseMove)
-
       if (isDrawing) {
         let point = {
           x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
@@ -488,14 +467,11 @@ const MapEditor = ({
 
         point.x = Math.max(0, Math.min(point.x, contentWidth));
         point.y = Math.max(0, Math.min(point.y, contentHeight));
-
-        // === SỬA LẠI: Lật tọa độ Y của chuột trước khi tính toán ===
         const flippedY = contentHeight - point.y;
 
         onObjectsChange((prev) => {
           if (tool === "draw_wall" && prev.walls.length > 0) {
             let lastWall = { ...prev.walls[prev.walls.length - 1] };
-            // Cập nhật điểm cuối của tường bằng tọa độ đã lật
             lastWall.points = [
               lastWall.points[0],
               lastWall.points[1],
@@ -509,7 +485,6 @@ const MapEditor = ({
             prev.zones.length > 0
           ) {
             let lastZone = { ...prev.zones[prev.zones.length - 1] };
-            // Tính toán width và height dựa trên tọa độ đã lật
             lastZone.width = point.x - lastZone.x;
             lastZone.height = lastZone.y - flippedY; // y_start(đã lật) - y_end(đã lật)
             return { ...prev, zones: [...prev.zones.slice(0, -1), lastZone] };
@@ -538,22 +513,18 @@ const MapEditor = ({
   );
 
   const handleMouseUp = () => {
-    // Trong hàm handleMouseUp()
-
     if (isMovingSelection) {
       setIsMovingSelection(false);
     }
 
     if (isDrawing && tool === "area_select") {
       const ids = [];
-      // Tìm tất cả các điểm trong vùng chọn
       points.forEach((p) => {
         if (isPointInRect(p, selectionRect)) {
           ids.push(p.id);
         }
       });
 
-      // Tìm tất cả các đường mà CẢ HAI điểm đầu cuối đều trong vùng chọn
       paths.forEach((path) => {
         const startPoint = points.find(
           (p) => p.id === (path.from || path.pointIds?.[0])
@@ -575,14 +546,12 @@ const MapEditor = ({
       setSelectedObjectIds(ids);
     }
 
-    // THÊM VÀO ĐẦU HÀM
     if (movingPointId) {
-      setMovingPointId(null); // Kết thúc di chuyển
+      setMovingPointId(null);
+      setCrosshair({ ...crosshair, visible: false });
     }
     setIsDrawing(false);
   };
-
-  // File: MapEditor.js
 
   const handleObjectClick = (e, object) => {
     if (e.evt.button !== 0) {
@@ -591,14 +560,10 @@ const MapEditor = ({
     e.cancelBubble = true;
 
     if (tool === "measure") {
-      // Tạo một điểm mới từ tọa độ của node đã click (hệ bottom-left)
       const snappedPoint = { x: object.x, y: object.y };
-
-      // Nếu đây là điểm bắt đầu đo
       if (measurement.points.length === 0) {
         setMeasurement({ points: [snappedPoint, snappedPoint], distance: 0 });
       } else {
-        // Nếu đây là điểm kết thúc đo
         const startPoint = measurement.points[0];
         const dx = snappedPoint.x - startPoint.x;
         const dy = snappedPoint.y - startPoint.y;
@@ -610,40 +575,28 @@ const MapEditor = ({
           distance: distInMeters,
         });
       }
-      return; // Dừng lại, không chạy logic của các công cụ khác
-    }
-
-    if (tool === "select") {
-      // 1. Vẫn chọn đối tượng để nó được highlight
-      onSelectedIdChange(object.id);
-      // 2. Mở ngay lập tức bảng chỉnh sửa
-      onEditObject(object);
       return;
     }
 
-    // Xử lý khi click vào một điểm (Point)
+    if (tool === "select") {
+      onSelectedIdChange(object.id);
+      onEditObject(object);
+      return;
+    }
     if (object.type === "point") {
-      // --- LOGIC MỚI: Gộp việc vẽ đường thẳng và đường cong ---
       if (tool === "draw_path_straight" || tool === "draw_path_curved") {
         if (!pathStartPointId) {
-          // Click lần đầu: Lưu điểm bắt đầu
           setPathStartPointId(object.id);
         } else {
-          // Click lần hai: Tạo đường đi và reset
           const startPoint = findObjectById(pathStartPointId);
           const endPoint = object;
 
           if (!startPoint || startPoint.id === endPoint.id) {
-            // Nếu có lỗi hoặc click lại vào chính điểm bắt đầu, hủy thao tác
             setPathStartPointId(null);
             return;
           }
 
-          // --- BẮT ĐẦU LOGIC MỚI ĐÃ SỬA LỖI ---
-
-          // TRƯỜNG HỢP 1: ĐANG VẼ ĐƯỜNG THẲNG
           if (tool === "draw_path_straight") {
-            // Tìm đường đi bất kỳ (xuôi hoặc ngược) giữa 2 điểm
             const existingPath = paths.find((p) => {
               const pStart = p.from || p.pointIds?.[0];
               const pEnd = p.to || p.pointIds?.[p.pointIds.length - 1];
@@ -653,9 +606,7 @@ const MapEditor = ({
               );
             });
 
-            // Nếu đã có đường
             if (existingPath) {
-              // Và nó là 1 chiều, thì nâng cấp lên 2 chiều
               if (existingPath.direction === "one-way") {
                 onObjectsChange((prev) => ({
                   ...prev,
@@ -668,10 +619,8 @@ const MapEditor = ({
                 onContentChange();
                 alert("Đường đi đã được cập nhật thành hai chiều.");
               } else {
-                // Nếu đã là 2 chiều rồi thì báo lỗi
                 alert("Đường đi hai chiều đã tồn tại giữa hai điểm này.");
               }
-              // Nếu chưa có đường nào thì tạo mới
             } else {
               const newPath = {
                 id: `path_${startPoint.id}_${endPoint.id}_${Date.now()}`,
@@ -689,8 +638,6 @@ const MapEditor = ({
               }));
               onContentChange();
             }
-
-            // TRƯỜNG HỢP 2: ĐANG VẼ ĐƯỜNG CONG
           } else if (tool === "draw_path_curved") {
             // Chỉ tìm đường đi chính xác theo hướng đang vẽ (A -> B)
             const pathInSameDirectionExists = paths.some((p) => {
@@ -740,11 +687,7 @@ const MapEditor = ({
               onContentChange();
             }
           }
-
-          // Reset sau khi hoàn thành
           setPathStartPointId(null);
-
-          // --- KẾT THÚC LOGIC MỚI ---
         }
       }
     }
@@ -1098,6 +1041,8 @@ const MapEditor = ({
               contentHeight={contentHeight}
               handleObjectClick={handleObjectClick}
               handlePointContextMenu={handlePointContextMenu}
+              onPointMouseOver={handlePointMouseOver}
+              onPointMouseOut={handlePointMouseOut}
               selectedObjectIds={selectedObjectIds}
             />
 
@@ -1114,6 +1059,7 @@ const MapEditor = ({
               stage={stage}
               contentHeight={contentHeight}
               contentWidth={contentWidth}
+              movingPointId={movingPointId}
             />
             {selectionRect.visible && (
               <Rect
@@ -1151,6 +1097,14 @@ const MapEditor = ({
           onDeletePaths={() => handleAreaMenuActions("deletePaths")}
           onDeletePoints={() => handleAreaMenuActions("deletePoints")}
           onClose={() => setAreaContextMenu({ visible: false })}
+        />
+      )}
+
+      {hoverTooltip.visible && (
+        <HoverTooltip
+          x={hoverTooltip.x}
+          y={hoverTooltip.y}
+          content={hoverTooltip.content}
         />
       )}
     </div>

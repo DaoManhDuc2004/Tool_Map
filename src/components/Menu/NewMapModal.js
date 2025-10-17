@@ -1,13 +1,10 @@
-// src/NewMapModal.js
-
 import React, { useState, useRef } from "react";
-import "./NewMapModal.css";
+import "../../CSS//NewMapModal.css";
 
 const NewMapModal = ({ isOpen, onClose, onCreate }) => {
   const [mapType, setMapType] = useState("blank");
   const [backgroundImage, setBackgroundImage] = useState(null);
 
-  // State được khởi tạo bằng chuỗi để sửa lỗi "số 0"
   const [config, setConfig] = useState({
     width: "100",
     height: "100",
@@ -15,8 +12,6 @@ const NewMapModal = ({ isOpen, onClose, onCreate }) => {
   });
 
   const fileInputRef = useRef(null);
-
-  // *** ĐÃ XÓA HOÀN TOÀN useEffect TỰ ĐỘNG TÍNH TOÁN ***
 
   if (!isOpen) return null;
 
@@ -36,8 +31,6 @@ const NewMapModal = ({ isOpen, onClose, onCreate }) => {
       reader.readAsDataURL(file);
     }
   };
-
-  // src/NewMapModal.js
 
   const handleSubmit = () => {
     // Chuyển đổi chuỗi thành số khi bấm "Tạo"
@@ -138,7 +131,6 @@ const NewMapModal = ({ isOpen, onClose, onCreate }) => {
             name="width"
             value={config.width}
             onChange={handleChange}
-            // KHÔNG CÓ readOnly
           />
         </div>
         <div className="form-group">

@@ -1,0 +1,16 @@
+.hover-tooltip {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  z-index: 1000;
+  pointer-events: none; /* QUAN TRỌNG: Để tooltip không bắt sự kiện chuột */
+  white-space: nowrap; /* Ngăn text xuống dòng không mong muốn */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.hover-tooltip p {
+  margin: 4px 0;
+}

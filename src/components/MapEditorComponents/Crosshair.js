@@ -1,8 +1,15 @@
 import React from "react";
 import { Line, Text } from "react-konva";
 // File này là định vị chuột khi đang chọn vẽ Node
-const Crosshair = ({ tool, crosshair, stage, contentHeight, contentWidth }) => {
-  if (tool !== "place_point" || !crosshair.visible) {
+const Crosshair = ({
+  tool,
+  crosshair,
+  stage,
+  contentHeight,
+  contentWidth,
+  movingPointId,
+}) => {
+  if ((tool !== "place_point" && !movingPointId) || !crosshair.visible) {
     return null;
   }
 

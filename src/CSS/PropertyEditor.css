@@ -1,7 +1,4 @@
-/* src/PropertyEditor.css */
-
 .property-editor {
-  /* Sửa lại vị trí và màu sắc */
   position: fixed;
   top: 50%;
   right: 20px;
@@ -14,12 +11,10 @@
   z-index: 1000;
   color: white; /* Đổi màu chữ thành trắng */
 
-  /* === BẮT ĐẦU PHẦN QUAN TRỌNG === */
   display: flex;
   flex-direction: column;
-  height: 90vh; /* Giới hạn chiều cao bằng 90% chiều cao màn hình */
-  max-height: 700px; /* Chiều cao tối đa, tránh bị quá dài */
-  /* ================================ */
+  height: 90vh;
+  max-height: 700px;
 }
 
 .editor-header {
@@ -29,8 +24,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  /* === THÊM MỚI === */
-  flex-shrink: 0; /* Không cho co lại */
+  flex-shrink: 0;
 }
 
 .editor-header h3 {
@@ -52,9 +46,8 @@
   flex-direction: column;
   gap: 15px;
 
-  /* === THÊM 2 DÒNG NÀY VÀO ĐÂY === */
-  overflow-y: auto; /* Tự động hiển thị thanh trượt dọc */
-  flex-grow: 1; /* Cho phép lấp đầy không gian còn lại */
+  overflow-y: auto;
+  flex-grow: 1;
 }
 
 .form-group {
@@ -66,10 +59,9 @@
   margin-bottom: 5px;
   font-weight: bold;
   font-size: 14px;
-  color: #bbb; /* Màu chữ label nhạt hơn */
+  color: #bbb;
 }
 
-/* Style cho input và select ở theme tối */
 .form-group input,
 .form-group select {
   padding: 8px;
