@@ -42,6 +42,7 @@ const MapEditor = ({
   onDeletePointsInSelection,
   onDeletePathsInSelection,
   currentLevelId,
+  onBackgroundImageChange,
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -875,6 +876,9 @@ const MapEditor = ({
           onDeletePointsInSelection(pointIds);
         }
         break;
+      case "eraseBg":
+        handleEraseBackground(selectionRect);
+        return;
       default:
         break;
     }
@@ -884,7 +888,88 @@ const MapEditor = ({
     setSelectedObjectIds([]);
   };
 
-  // ... (Các hằng số stageWidth, stageHeight,... không đổi)
+  const handleEraseBackground = (rect) => {
+    if (!backgroundImage) return;
+
+    // 1. Tạo một canvas ẩn
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    // 2. Tạo một đối tượng Ảnh từ dataURL (ảnh nền hiện tại)
+    const img = new window.Image();
+    img.onload = () => {
+      // 3. Đặt kích thước canvas bằng kích thước ảnh GỐC
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // --- SỬA LỖI BẮT ĐẦU TỪ ĐÂY ---
+
+      // 4. Tính toán tỉ lệ scale
+      // contentWidth/Height là kích thước bản đồ (từ mapConfig)
+      // img.width/height là kích thước ảnh gốc
+      const scaleX = img.width / contentWidth;
+      const scaleY = img.height / contentHeight;
+
+      // 5. Chuẩn hóa tọa độ vùng chọn (từ "thế giới bản đồ")
+      const map_x = Math.min(rect.x, rect.x + rect.width);
+      const map_y = Math.min(rect.y, rect.y + rect.height);
+      const map_width = Math.abs(rect.width);
+      const map_height = Math.abs(rect.height);
+
+      // 6. Scale tọa độ vùng chọn sang "thế giới ảnh"
+      const img_x = map_x * scaleX;
+      const img_y = map_y * scaleY;
+      const img_width = map_width * scaleX;
+      const img_height = map_height * scaleY;
+
+      // 7. Giới hạn vùng chọn trong phạm vi ảnh (sử dụng tọa độ _img)
+      const startX = Math.max(0, Math.floor(img_x));
+      const startY = Math.max(0, Math.floor(img_y));
+      const endX = Math.min(img.width, Math.ceil(img_x + img_width));
+      const endY = Math.min(img.height, Math.ceil(img_y + img_height));
+
+      const rectWidth = endX - startX;
+      const rectHeight = endY - startY;
+      // --- KẾT THÚC SỬA LỖI ---
+
+      if (rectWidth <= 0 || rectHeight <= 0) return; // Không có gì để làm
+
+      // 8. Lấy dữ liệu pixel của vùng đã chọn (sử dụng startX, startY đã scale)
+      const imageData = ctx.getImageData(startX, startY, rectWidth, rectHeight);
+      const data = imageData.data;
+      const threshold = 50; // Ngưỡng màu đen
+
+      // 9. Lặp qua từng pixel và chuyển màu đen/tối thành trắng
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+
+        // Nếu pixel là màu tối (gần như đen)
+        if (r < threshold && g < threshold && b < threshold) {
+          data[i] = 255; // R = 255 (trắng)
+          data[i + 1] = 255; // G = 255 (trắng)
+          data[i + 2] = 255; // B = 255 (trắng)
+          data[i + 3] = 255; // Alpha = 255 (rõ nét)
+        }
+      }
+      // 10. Vẽ lại dữ liệu pixel đã sửa (dùng startX, startY đã scale)
+      ctx.putImageData(imageData, startX, startY);
+      const newImageBase64 = canvas.toDataURL("image/png");
+
+      // Gửi ảnh mới lên App.js để cập nhật state
+      onBackgroundImageChange(newImageBase64);
+
+      // Đóng menu và reset vùng chọn
+      setAreaContextMenu({ visible: false });
+      setSelectionRect({ visible: false });
+      setSelectedObjectIds([]);
+    };
+
+    img.src = backgroundImage;
+  };
+
   const stageWidth = size.width;
   const stageHeight = size.height;
 
@@ -1091,11 +1176,10 @@ const MapEditor = ({
         <AreaContextMenu
           x={areaContextMenu.x}
           y={areaContextMenu.y}
-          // onMove chưa có chức năng nên chỉ cần đóng menu
           onMove={() => setAreaContextMenu({ visible: false })}
-          // Gọi hàm xử lý với action tương ứng
           onDeletePaths={() => handleAreaMenuActions("deletePaths")}
           onDeletePoints={() => handleAreaMenuActions("deletePoints")}
+          onEraseBackground={() => handleAreaMenuActions("eraseBg")}
           onClose={() => setAreaContextMenu({ visible: false })}
         />
       )}

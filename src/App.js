@@ -378,6 +378,20 @@ function App() {
     }
   };
 
+  const handleBackgroundImageChange = (newImageBase64) => {
+    if (!currentLevelId) return;
+
+    // Cập nhật lại ảnh nền cho tầng hiện tại
+    setLevels((prevLevels) =>
+      prevLevels.map((level) =>
+        level.levelId === currentLevelId
+          ? { ...level, backgroundImage: newImageBase64 }
+          : level
+      )
+    );
+    setIsDirty(true);
+  };
+
   const handleCreateMap = (config, initialLevels) => {
     setFileHandle(null);
     setSiteId("");
@@ -692,6 +706,7 @@ function App() {
             onDeletePointsInSelection={handleDeletePointsInSelection}
             onDeletePathsInSelection={handleDeletePathsInSelection}
             currentLevelId={currentLevelId}
+            onBackgroundImageChange={handleBackgroundImageChange}
           />
         )}
         {isEditorOpen && (

@@ -7,6 +7,7 @@ const AreaContextMenu = ({
   onMove,
   onDeletePaths,
   onDeletePoints,
+  onEraseBackground,
   onClose,
 }) => {
   const menuStyle = {
@@ -28,6 +29,7 @@ const AreaContextMenu = ({
       <ul>
         <li onClick={onDeletePaths}>Xóa Đường trong Vùng</li>
         <li onClick={onDeletePoints}>Xóa Điểm trong Vùng</li>
+        <li onClick={onEraseBackground}>Xóa Nền Đen (Trắng)</li>
         <li onClick={onClose}>Đóng</li>
       </ul>
     </div>
