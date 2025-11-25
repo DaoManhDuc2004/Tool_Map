@@ -1,0 +1,54 @@
+.robot-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.robot-modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  width: 300px;
+}
+
+.robot-modal-content h4 {
+  margin-top: 0;
+}
+
+.robot-modal-content .input-group {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.robot-modal-content .input-group label {
+  width: 50px;
+  font-weight: bold;
+}
+
+.robot-modal-content .input-group input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.robot-modal-content .modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.robot-modal-content .modal-buttons .btn-primary {
+  background-color: #007bff;
+  color: white;
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Stage, Layer, Image, Rect, Group } from "react-konva";
+import { Stage, Layer, Image, Rect, Group, Circle, Text } from "react-konva";
 import "./CSS/MapEditor.css";
 
 import PointLayer from "./components/MapEditorComponents/PointLayer";
@@ -43,6 +43,9 @@ const MapEditor = ({
   onDeletePathsInSelection,
   currentLevelId,
   onBackgroundImageChange,
+  originOffset,
+  robotPose,
+  onOriginChange,
 }) => {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -112,8 +115,8 @@ const MapEditor = ({
   const resetStage = (contentWidth, contentHeight) => {
     if (!containerRef.current || !contentWidth || !contentHeight) return;
 
-    const containerWidth = containerRef.current.offsetWidth;
-    const containerHeight = containerRef.current.offsetHeight;
+    const containerWidth = size.width;
+    const containerHeight = size.height;
     const padding = 0.9;
     const scaleX = (containerWidth / contentWidth) * padding;
     const scaleY = (containerHeight / contentHeight) * padding;
@@ -150,11 +153,15 @@ const MapEditor = ({
   // MapEditor.js
 
   useEffect(() => {
-    if (contentWidth > 0 && contentHeight > 0) {
+    if (
+      contentWidth > 0 &&
+      contentHeight > 0 &&
+      size.width > 0 &&
+      size.height > 0
+    ) {
       resetStage(contentWidth, contentHeight);
     }
   }, [contentWidth, contentHeight, size]);
-
   useEffect(() => {
     onSelectedIdChange(null);
     setPathStartPointId(null);
@@ -294,13 +301,22 @@ const MapEditor = ({
     const id = `${tool}_${Date.now()}`;
     const flippedY = contentHeight - point.y;
 
+    // [THAY THẾ toàn bộ khối onObjectsChange bên trong hàm handleMouseDown]
     onObjectsChange((prev) => {
       if (tool === "draw_wall") {
+        // SỬA LẠI: Lưu tọa độ tương đối (so với Mốc A)
+        // và lưu cả 2 điểm Y là y_flipped cho nhất quán
+        const relativeX = point.x - originOffset.x;
+        const relativeY = flippedY - originOffset.y;
         return {
           ...prev,
           walls: [
             ...prev.walls,
-            { id, points: [point.x, point.y, point.x, flippedY], type: "wall" },
+            {
+              id,
+              points: [relativeX, relativeY, relativeX, relativeY],
+              type: "wall",
+            },
           ],
         };
       }
@@ -316,8 +332,9 @@ const MapEditor = ({
             ...prev.zones,
             {
               id,
-              x: point.x,
-              y: flippedY,
+              // THAY ĐỔI: Trừ offset để lưu tọa độ TƯƠNG ĐỐI
+              x: point.x - originOffset.x,
+              y: flippedY - originOffset.y,
               width: 0,
               height: 0,
               fill: fillColors[tool],
@@ -363,18 +380,25 @@ const MapEditor = ({
         y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
       };
       if (movingPointId) {
-        const finalX = Math.max(0, Math.min(point.x, contentWidth));
-        const finalY = Math.max(0, Math.min(point.y, contentHeight));
-        const finalY_flipped = contentHeight - finalY;
+        const finalX = Math.max(0, Math.min(point.x, contentWidth)); // world_x
+        const finalY = Math.max(0, Math.min(point.y, contentHeight)); // world_y (top-left)
+        const finalY_flipped = contentHeight - finalY; // world_y_flipped
+
+        // Crosshair vẫn dùng tọa độ WORLD
         setCrosshair({
           x: finalX,
           y: finalY_flipped,
           visible: true,
         });
+
+        // THAY ĐỔI: Cập nhật state với tọa độ TƯƠNG ĐỐI
+        const relativeX = finalX - originOffset.x;
+        const relativeY = finalY_flipped - originOffset.y;
+
         onObjectsChange((prev) => ({
           ...prev,
           points: prev.points.map((p) =>
-            p.id === movingPointId ? { ...p, x: finalX, y: finalY_flipped } : p
+            p.id === movingPointId ? { ...p, x: relativeX, y: relativeY } : p
           ),
         }));
         onContentChange();
@@ -473,11 +497,12 @@ const MapEditor = ({
         onObjectsChange((prev) => {
           if (tool === "draw_wall" && prev.walls.length > 0) {
             let lastWall = { ...prev.walls[prev.walls.length - 1] };
+            // THAY ĐỔI: Cập nhật điểm cuối (tương đối)
             lastWall.points = [
-              lastWall.points[0],
-              lastWall.points[1],
-              point.x,
-              flippedY, // Dùng flippedY
+              lastWall.points[0], // x1_rel (từ mousedown)
+              lastWall.points[1], // y1_rel (từ mousedown)
+              point.x - originOffset.x, // x2_rel
+              flippedY - originOffset.y, // y2_rel
             ];
             return { ...prev, walls: [...prev.walls.slice(0, -1), lastWall] };
           }
@@ -485,9 +510,19 @@ const MapEditor = ({
             ["draw_rect", "draw_nogo", "draw_slow"].includes(tool) &&
             prev.zones.length > 0
           ) {
-            let lastZone = { ...prev.zones[prev.zones.length - 1] };
-            lastZone.width = point.x - lastZone.x;
-            lastZone.height = lastZone.y - flippedY; // y_start(đã lật) - y_end(đã lật)
+            let lastZone = { ...prev.zones[prev.zones.length - 1] }; // x,y của lastZone đã là TƯƠNG ĐỐI
+
+            // Tọa độ chuột (thế giới)
+            const worldX = point.x;
+            const worldY_flipped = flippedY;
+
+            // Tọa độ chuột (TƯƠNG ĐỐI)
+            const relativeX = worldX - originOffset.x;
+            const relativeY = worldY_flipped - originOffset.y;
+
+            // Width/Height là chênh lệch của tọa độ tương đối
+            lastZone.width = relativeX - lastZone.x;
+            lastZone.height = lastZone.y - relativeY; // (y_start_rel) - (y_end_rel)
             return { ...prev, zones: [...prev.zones.slice(0, -1), lastZone] };
           }
           return prev;
@@ -599,8 +634,13 @@ const MapEditor = ({
 
           if (tool === "draw_path_straight") {
             const existingPath = paths.find((p) => {
-              const pStart = p.from || p.pointIds?.[0];
-              const pEnd = p.to || p.pointIds?.[p.pointIds.length - 1];
+              // 1. Chỉ tìm các đường THẲNG đã tồn tại
+              if (p.pathType !== "straight") return false;
+
+              // 2. Đường thẳng chỉ dùng 'from' và 'to'
+              const pStart = p.from;
+              const pEnd = p.to;
+
               return (
                 (pStart === startPoint.id && pEnd === endPoint.id) ||
                 (pStart === endPoint.id && pEnd === startPoint.id)
@@ -641,7 +681,11 @@ const MapEditor = ({
             }
           } else if (tool === "draw_path_curved") {
             // Chỉ tìm đường đi chính xác theo hướng đang vẽ (A -> B)
+            // Chỉ tìm đường đi chính xác theo hướng đang vẽ (A -> B)
             const pathInSameDirectionExists = paths.some((p) => {
+              // 1. Chỉ tìm các đường CONG đã tồn tại
+              if (p.pathType !== "curved") return false;
+
               const pStart = p.from || p.pointIds?.[0];
               const pEnd = p.to || p.pointIds?.[p.pointIds.length - 1];
               return pStart === startPoint.id && pEnd === endPoint.id;
@@ -694,19 +738,24 @@ const MapEditor = ({
     }
   };
 
+  // [THAY THẾ toàn bộ hàm handleControlPointDrag]
   const handleControlPointDrag = (e, pathId, controlPointIndex) => {
-    const newX = e.target.x();
-    const newY = e.target.y();
+    const newX_world = e.target.x(); // Đây là x "thế giới" (world)
+    const newY_world_konva = e.target.y(); // Đây là y "thế giới" (top-left)
 
-    // SỬA LẠI: Lật tọa độ Y trước khi cập nhật state
-    const flippedY = contentHeight - newY;
+    // Lật tọa độ Y
+    const flippedY_world = contentHeight - newY_world_konva;
+
+    // THAY ĐỔI: Chuyển sang tọa độ tương đối
+    const relativeX = newX_world - originOffset.x;
+    const relativeY = flippedY_world - originOffset.y;
 
     onObjectsChange((prevObjects) => {
       const newPaths = prevObjects.paths.map((path) => {
         if (path.id === pathId) {
           const newControlPoints = [...path.controlPoints];
-          // Lưu tọa độ đã được lật
-          newControlPoints[controlPointIndex] = { x: newX, y: flippedY };
+          // Lưu tọa độ tương đối
+          newControlPoints[controlPointIndex] = { x: relativeX, y: relativeY };
           return { ...path, controlPoints: newControlPoints };
         }
         return path;
@@ -728,34 +777,47 @@ const MapEditor = ({
       setContextMenu({ ...contextMenu, visible: false });
     }
 
+    const pos = konvaStage.getPointerPosition();
+    const point_world = {
+      // Tọa độ "Thế giới" (so với gốc ảnh)
+      x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
+      y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
+    };
+
+    const finalX_world = point_world.x;
+    const finalY_world_flipped = contentHeight - point_world.y;
+
+    // Kiểm tra ngoài bản đồ
+    if (
+      finalX_world < 0 ||
+      finalX_world > contentWidth ||
+      finalY_world_flipped < 0 ||
+      finalY_world_flipped > contentHeight
+    ) {
+      alert("Không thể thao tác ở ngoài phạm vi bản đồ.");
+      return;
+    }
+
+    // THÊM MỚI: Logic cho tool "Đặt Mốc"
+    if (tool === "relocate") {
+      // Gọi hàm handler từ App.js với tọa độ THẾ GIỚI
+      onOriginChange({ x: finalX_world, y: finalY_world_flipped });
+      // Tự động chuyển về tool "select" sau khi đặt mốc
+      setTool("select");
+      return;
+    }
+
     if (tool === "place_point") {
-      const pos = konvaStage.getPointerPosition();
-      const point = {
-        x: (pos.x - konvaStage.x()) / konvaStage.scaleX(),
-        y: (pos.y - konvaStage.y()) / konvaStage.scaleY(),
-      };
-
-      // Tọa độ cuối cùng giờ đây chính là tọa độ chuột
-      const finalX = point.x;
-      const finalY = point.y;
-
-      const finalY_flipped = contentHeight - finalY;
-
-      if (
-        finalX < 0 ||
-        finalX > contentWidth ||
-        finalY_flipped < 0 ||
-        finalY_flipped > contentHeight
-      ) {
-        alert("Không thể đặt điểm ở ngoài phạm vi bản đồ.");
-        return;
-      }
-
       const id = `point_${Date.now()}`;
+
+      // THAY ĐỔI: Trừ đi originOffset để lấy tọa độ TƯƠNG ĐỐI
+      const relativeX = finalX_world - originOffset.x;
+      const relativeY = finalY_world_flipped - originOffset.y;
+
       const newPoint = {
         id,
-        x: finalX,
-        y: finalY_flipped,
+        x: relativeX, // <-- Lưu tọa độ TƯƠNG ĐỐI
+        y: relativeY, // <-- Lưu tọa độ TƯƠNG ĐỐI
         elevation: 0,
         type: "point",
         nodeType: "running area",
@@ -1041,6 +1103,13 @@ const MapEditor = ({
         >
           📏Thước đo
         </button>
+        <button
+          title="Đặt Mốc Tọa Độ (A)"
+          className={tool === "relocate" ? "active" : ""}
+          onClick={() => setTool("relocate")}
+        >
+          📍 Đặt Mốc
+        </button>
         <button title="Bật/Tắt Lưới" disabled>
           🔳
         </button>
@@ -1091,45 +1160,89 @@ const MapEditor = ({
                 image={image}
                 x={0}
                 y={0}
-                width={contentWidth} // <-- THÊM DÒNG NÀY
-                height={contentHeight} // <-- THÊM DÒNG NÀY
+                width={contentWidth}
+                height={contentHeight}
                 listening={false}
               />
             )}
-            <ZoneLayer
-              walls={walls}
-              zones={zones}
-              selectedId={selectedId}
-              stage={stage}
-              contentHeight={contentHeight}
-              handleObjectClick={handleObjectClick}
-            />
+            <Group x={originOffset.x} y={-originOffset.y}>
+              <ZoneLayer
+                walls={walls}
+                zones={zones}
+                selectedId={selectedId}
+                stage={stage}
+                contentHeight={contentHeight}
+                handleObjectClick={handleObjectClick}
+              />
 
-            <PathLayer
-              paths={paths}
-              points={points} // PathLayer cần biết các điểm để vẽ đường
-              selectedId={selectedId}
-              stage={stage}
-              contentHeight={contentHeight}
-              handleObjectClick={handleObjectClick}
-              handleControlPointDrag={handleControlPointDrag}
-              setIsStageDraggable={setIsStageDraggable}
-              drawingPathPoints={drawingPathPoints} // Truyền cả đường đang vẽ
-            />
+              <PathLayer
+                paths={paths}
+                points={points}
+                selectedId={selectedId}
+                stage={stage}
+                contentHeight={contentHeight}
+                handleObjectClick={handleObjectClick}
+                handleControlPointDrag={handleControlPointDrag}
+                setIsStageDraggable={setIsStageDraggable}
+                drawingPathPoints={drawingPathPoints} // Truyền cả đường đang vẽ
+              />
 
-            <PointLayer
-              points={points}
-              selectedId={selectedId}
-              pathStartPointId={pathStartPointId}
-              drawingPathPoints={drawingPathPoints}
-              stage={stage}
-              contentHeight={contentHeight}
-              handleObjectClick={handleObjectClick}
-              handlePointContextMenu={handlePointContextMenu}
-              onPointMouseOver={handlePointMouseOver}
-              onPointMouseOut={handlePointMouseOut}
-              selectedObjectIds={selectedObjectIds}
-            />
+              <PointLayer
+                points={points}
+                selectedId={selectedId}
+                pathStartPointId={pathStartPointId}
+                drawingPathPoints={drawingPathPoints}
+                stage={stage}
+                contentHeight={contentHeight}
+                handleObjectClick={handleObjectClick}
+                handlePointContextMenu={handlePointContextMenu}
+                onPointMouseOver={handlePointMouseOver}
+                onPointMouseOut={handlePointMouseOut}
+                selectedObjectIds={selectedObjectIds}
+              />
+              {robotPose && (
+                <Text
+                  x={robotPose.x * pixelsPerMeter}
+                  y={contentHeight - robotPose.y * pixelsPerMeter}
+                  text="🤖"
+                  fontSize={20 / stage.scale} // Kích thước icon (bạn có thể chỉnh 30 to/nhỏ tùy ý)
+                  // 2 dòng offset này để căn icon vào chính giữa tọa độ
+                  offsetX={15 / stage.scale} // (bằng 1/2 fontSize)
+                  offsetY={15 / stage.scale} // (bằng 1/2 fontSize)
+                  listening={false}
+                />
+              )}
+            </Group>
+
+            <Group
+              x={originOffset.x}
+              y={contentHeight - originOffset.y} // Lật trục Y sang tọa độ Konva (top-left)
+              listening={false} // Không cho phép click vào mốc này
+              opacity={0.7}
+            >
+              {/* Đường kẻ ngang */}
+              <Rect
+                x={-20 / stage.scale}
+                y={-1 / stage.scale}
+                width={40 / stage.scale}
+                height={2 / stage.scale}
+                fill="magenta"
+              />
+              {/* Đường kẻ dọc */}
+              <Rect
+                x={-1 / stage.scale}
+                y={-20 / stage.scale}
+                width={2 / stage.scale}
+                height={40 / stage.scale}
+                fill="magenta"
+              />
+              {/* Vòng tròn ở tâm */}
+              <Circle
+                radius={5 / stage.scale}
+                stroke="magenta"
+                strokeWidth={1.5 / stage.scale}
+              />
+            </Group>
 
             <MeasurementLayer
               tool={tool}
@@ -1145,6 +1258,8 @@ const MapEditor = ({
               contentHeight={contentHeight}
               contentWidth={contentWidth}
               movingPointId={movingPointId}
+              originOffset={originOffset}
+              pixelsPerMeter={pixelsPerMeter}
             />
             {selectionRect.visible && (
               <Rect

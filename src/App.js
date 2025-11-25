@@ -4,6 +4,7 @@ import MapEditor from "./MapEditor";
 import NewMapModal from "./components/Menu/NewMapModal";
 import PropertyEditor from "./components/MapEditorComponents/PropertyEditor";
 import LevelManagerModal from "./components/MapEditorComponents/LevelManagerModal";
+import RobotPoseModal from "./components/MapEditorComponents/RobotPoseModal";
 
 function App() {
   const stageRef = useRef(null);
@@ -21,6 +22,10 @@ function App() {
     points: [],
     paths: [],
   });
+  // Vị trí của mốc A :
+  const [originOffset, setOriginOffset] = useState({ x: 0, y: 0 });
+  // robotPose: Vị trí ban đầu của Robot  so với Mốc A
+  const [robotPose, setRobotPose] = useState(null);
 
   const visibleObjects = useMemo(() => {
     // Nếu không có tầng nào được chọn, trả về đối tượng rỗng
@@ -44,12 +49,16 @@ function App() {
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isLevelManagerOpen, setIsLevelManagerOpen] = useState(false);
+  const [isRobotModalOpen, setIsRobotModalOpen] = useState(false);
   const [editingSelection, setEditingSelection] = useState(null);
   const [fileHandle, setFileHandle] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
   const resetMapObjects = () => {
     setAllObjects({ walls: [], zones: [], points: [], paths: [] });
+    // THÊM MỚI: Reset cả mốc tọa độ
+    setOriginOffset({ x: 0, y: 0 });
+    setRobotPose(null);
     setIsDirty(false);
   };
   const confirmAndExecute = (action) => {
@@ -158,12 +167,18 @@ function App() {
             }),
           };
 
+          const originOffsetInMeters = {
+            x: originOffset.x / pixelsPerMeter,
+            y: originOffset.y / pixelsPerMeter,
+          };
+
           const saveData = {
             siteId: siteId,
             siteName: siteName,
             mapConfig: mapConfig,
             levels: levels,
-            objects: objectsInMeters, // <-- Sử dụng đối tượng đã được chuyển đổi
+            objects: objectsInMeters,
+            originOffset_meters: originOffsetInMeters,
           };
           const jsonString = JSON.stringify(saveData, null, 2);
           await writable.write(jsonString);
@@ -305,6 +320,14 @@ function App() {
               }),
             };
 
+            let loadedOriginOffset = { x: 0, y: 0 };
+            if (loadedData.originOffset_meters) {
+              loadedOriginOffset = {
+                x: loadedData.originOffset_meters.x * pixelsPerMeter,
+                y: loadedData.originOffset_meters.y * pixelsPerMeter,
+              };
+            }
+
             setFileHandle(handle);
             setSiteId(loadedData.siteId || "");
             setSiteName(loadedData.siteName || "");
@@ -312,6 +335,8 @@ function App() {
             setAllObjects(objectsInPixels);
             setLevels(loadedData.levels || []);
             setCurrentLevelId(loadedData.levels?.[0]?.levelId || null);
+            setOriginOffset(loadedOriginOffset);
+            setRobotPose(null);
             setIsDirty(false);
             alert("Đã mở bản đồ thành công!");
           } else {
@@ -599,6 +624,174 @@ function App() {
     setIsDirty(true);
   };
 
+  // [THÊM MỚI: Ngay trước `useEffect` cuối cùng]
+
+  // THÊM MỚI: Hàm xử lý khi thay đổi mốc tọa độ (Mốc A)
+  const handleOriginChange = (newOriginInPixels) => {
+    // newOriginInPixels là tọa độ (x, y_flipped) so với gốc ảnh
+    const oldOrigin = originOffset;
+
+    // Tính toán độ chênh lệch (delta)
+    const delta = {
+      x: newOriginInPixels.x - oldOrigin.x,
+      y: newOriginInPixels.y - oldOrigin.y,
+    };
+
+    // Nếu không có chênh lệch, không làm gì cả
+    if (delta.x === 0 && delta.y === 0) return;
+
+    // Dịch chuyển TẤT CẢ các đối tượng bằng cách trừ delta
+    // Tọa độ mới = Tọa độ cũ - delta
+    setAllObjects((prev) => ({
+      walls: prev.walls.map((wall) => ({
+        ...wall,
+        // Giả định wall.points là [x1, y1_flipped, x2, y2_flipped]
+        points: [
+          wall.points[0] - delta.x,
+          wall.points[1] - delta.y,
+          wall.points[2] - delta.x,
+          wall.points[3] - delta.y,
+        ],
+      })),
+      zones: prev.zones.map((zone) => ({
+        ...zone,
+        x: zone.x - delta.x,
+        y: zone.y - delta.y,
+      })),
+      points: prev.points.map((point) => ({
+        ...point,
+        x: point.x - delta.x,
+        y: point.y - delta.y,
+      })),
+      paths: prev.paths.map((path) => {
+        if (path.pathType === "curved" && path.controlPoints) {
+          return {
+            ...path,
+            controlPoints: path.controlPoints.map((cp) => ({
+              x: cp.x - delta.x,
+              y: cp.y - delta.y,
+            })),
+          };
+        }
+        return path;
+      }),
+    }));
+
+    // Cập nhật mốc mới
+    setOriginOffset(newOriginInPixels);
+    setIsDirty(true);
+  };
+
+  // [Trong file App.js]
+
+const handleExportWaypoints = async () => {
+  if (!mapConfig || !mapConfig.pixelsPerMeter) {
+    alert("Cấu hình bản đồ chưa đầy đủ (thiếu pixelsPerMeter).");
+    return;
+  }
+
+  // 1. Chuẩn bị dữ liệu (Chuyển đổi tất cả sang mét trước)
+  const pointsInMeters = allObjects.points.map((p) => ({
+    ...p,
+    // Lưu ý: point.x/y trong state hiện tại là Pixel (Relative to Origin A)
+    // Ta chia cho ppm để ra mét
+    xm: p.x / mapConfig.pixelsPerMeter,
+    ym: p.y / mapConfig.pixelsPerMeter,
+    z: p.elevation || 0, // Nếu không có elevation thì bằng 0
+  }));
+
+  // 2. Tạo nội dung CSV
+  // Header file csv: name, x, y, z, theta
+  let csvContent = "name,x,y,z,theta\n";
+
+  pointsInMeters.forEach((currentPoint) => {
+    let theta = 0; // Mặc định là 0 độ (hướng 3 giờ)
+
+    // --- LOGIC TÍNH GÓC THETA TỰ ĐỘNG ---
+    // Tìm xem điểm này có phải là điểm BẮT ĐẦU của một đường đi nào không?
+    // (Tức là robot sẽ đi từ Current -> Next)
+    const connectedPath = allObjects.paths.find((path) => {
+      if (path.pathType === "straight") {
+        return path.from === currentPoint.id;
+      }
+      // Với đường cong, kiểm tra xem nó có phải điểm đầu tiên trong mảng pointIds không
+      if (path.pathType === "curved" && path.pointIds) {
+        return path.pointIds[0] === currentPoint.id;
+      }
+      return false;
+    });
+
+    if (connectedPath) {
+      // Tìm điểm tiếp theo (Target Point)
+      let nextPointId = null;
+      if (connectedPath.pathType === "straight") {
+        nextPointId = connectedPath.to;
+      } else if (connectedPath.pathType === "curved") {
+        // Điểm tiếp theo trong đường cong
+        nextPointId = connectedPath.pointIds[1]; 
+      }
+
+      const nextPointObj = pointsInMeters.find((p) => p.id === nextPointId);
+
+      if (nextPointObj) {
+        // Tính góc giữa 2 điểm: atan2(dy, dx)
+        // Kết quả là Radian (-3.14 đến 3.14)
+        const dx = nextPointObj.xm - currentPoint.xm;
+        const dy = nextPointObj.ym - currentPoint.ym;
+        theta = Math.atan2(dy, dx);
+      }
+    }
+    // --------------------------------------
+
+    // Làm tròn số liệu cho đẹp (4 chữ số thập phân)
+    const row = [
+      currentPoint.nodeName || currentPoint.id, // Name
+      currentPoint.xm.toFixed(4),               // X
+      currentPoint.ym.toFixed(4),               // Y
+      currentPoint.z.toFixed(4),                // Z
+      theta.toFixed(4)                          // Theta (Radian)
+    ].join(",");
+
+    csvContent += row + "\n";
+  });
+
+  // 3. Lưu file
+  if (!window.showSaveFilePicker) {
+     // Fallback cho trình duyệt cũ
+     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+     const url = URL.createObjectURL(blob);
+     const link = document.createElement("a");
+     link.href = url;
+     link.setAttribute("download", `waypoints_${Date.now()}.csv`);
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+     return;
+  }
+
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: `waypoints_${Date.now()}.csv`,
+      types: [{ description: "CSV File", accept: { "text/csv": [".csv"] } }],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(csvContent);
+    await writable.close();
+    alert("Xuất file Waypoints thành công!");
+  } catch (err) {
+    console.error("Hủy lưu file hoặc lỗi:", err);
+  }
+};
+
+  const handleSetRobotPose = (newPose) => {
+    // newPose là một object { x, y }
+    setRobotPose({
+      x: isNaN(newPose.x) ? 0 : newPose.x,
+      y: isNaN(newPose.y) ? 0 : newPose.y,
+    });
+    setIsRobotModalOpen(false); // Đóng modal sau khi set
+  };
+
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       // Nếu có thay đổi chưa lưu, kích hoạt cảnh báo của trình duyệt
@@ -636,6 +829,9 @@ function App() {
             </button>
           )}
           {mapConfig && <button onClick={handleExportImage}>Export</button>}
+          <button className="btn-secondary" onClick={handleExportWaypoints} style={{ marginLeft: "5px" }}>
+  📄 Xuất Waypoints (CSV)
+</button>
         </div>
 
         {/* Nhóm 2: Thông tin Site và Tầng */}
@@ -663,6 +859,16 @@ function App() {
               placeholder="Site Name"
               style={{ width: "250px" }}
             />
+          </div>
+
+          <div className="input-group">
+            <button
+              onClick={() => setIsRobotModalOpen(true)}
+              title="Đặt vị trí robot mô phỏng"
+              className="btn-robot" // Thêm class để dễ style
+            >
+              🤖 Location
+            </button>
           </div>
 
           {levels.length > 0 && (
@@ -707,6 +913,9 @@ function App() {
             onDeletePathsInSelection={handleDeletePathsInSelection}
             currentLevelId={currentLevelId}
             onBackgroundImageChange={handleBackgroundImageChange}
+            originOffset={originOffset}
+            robotPose={robotPose}
+            onOriginChange={handleOriginChange}
           />
         )}
         {isEditorOpen && (
@@ -729,6 +938,12 @@ function App() {
         onClose={() => setIsLevelManagerOpen(false)}
         levels={levels}
         onLevelsChange={handleLevelsChange}
+      />
+      <RobotPoseModal
+        isOpen={isRobotModalOpen}
+        onClose={() => setIsRobotModalOpen(false)}
+        onSetPose={handleSetRobotPose}
+        currentPose={robotPose || { x: 0, y: 0 }}
       />
     </div>
   );
